@@ -1,0 +1,3 @@
+interface:
+  display_name: "Tower Balance Maintainer"
+  short_description: "Sync and tune TD balance values"
