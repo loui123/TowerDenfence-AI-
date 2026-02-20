@@ -47,6 +47,13 @@ export const TOWER_TYPES = {
     cost: 100,
     stats: { damage: 8, range: 12, speed: 0.3, crit: 0, type: 'magic' },
     color: '#9C6BFF'
+  },
+  SUPPORT: {
+    id: 'support',
+    name: '輔助塔',
+    cost: 100,
+    stats: { damage: 0, range: 1, speed: 0, crit: 0, type: 'support' },
+    color: '#46D1C4'
   }
 };
 

@@ -56,6 +56,21 @@ export class GameEngine {
         const towerDef = Object.values(TOWER_TYPES).find(t => t.id === typeId);
         const statsBase = towerDef ? towerDef.stats : TOWER_TYPES.MELEE.stats;
 
+        if (statsBase.type === 'support') {
+            return {
+                ...statsBase,
+                damage: statsBase.damage,
+                range: statsBase.range,
+                speed: statsBase.speed,
+                crit: statsBase.crit,
+                kills: 0,
+                level: 1,
+                extraFire: 0,
+                extraWater: 0,
+                extraWood: 0
+            };
+        }
+
         const levelMults = {
             range: statsBase.range + this.getTalentValue('tower_range'),
             speed: statsBase.speed * (1 + this.getTalentValue('tower_atk_speed')),
@@ -123,6 +138,8 @@ export class GameEngine {
 
     update(dt) {
         if (this.hp <= 0 || this.victory) return;
+
+        this.updateSupportAuraState(dt);
 
         if (this.waveActive) {
             this.updateSpawning(dt);
@@ -254,6 +271,7 @@ export class GameEngine {
                 * this.getMobTerrainSpeedMultiplier(mob)
                 * (mob.slowMultiplier || 1)
                 * Math.max(0.05, waterSlowMult)
+                * Math.max(0.05, 1 - this.getSupportSlowPctForMob(mob))
                 * tornadoSpeedMult;
             if (mob.stunTimer > 0) {
                 continue;
@@ -305,6 +323,7 @@ export class GameEngine {
 
     updateTowers(dt) {
         this.towers.forEach(tower => {
+            if (tower?.stats?.type === 'support') return;
             const terrainMods = this.getTowerTerrainModifiers(tower);
             const globalSpeedMult = this.globalMasteries.speedAura ? 1.1 : 1.0;
             const towerSpeedMult = tower.masterySpeedMult || 1.0;
@@ -398,10 +417,10 @@ export class GameEngine {
         const auraBonus = this.getBannerAuraBonuses(tower);
         const critChance = Math.max(0, Math.min(1, tower.stats.crit + terrainMods.critBonus + globalCritBonus + auraBonus.critChance));
         const damage = {
-            base: tower.stats.damage * terrainMods.damageMult,
-            fire: (tower.stats.extraFire || 0) * terrainMods.damageMult,
-            water: (tower.stats.extraWater || 0) * terrainMods.damageMult,
-            wood: (tower.stats.extraWood || 0) * terrainMods.damageMult,
+            base: tower.stats.damage * terrainMods.damageMult * auraBonus.damageMult,
+            fire: (tower.stats.extraFire || 0) * terrainMods.damageMult * auraBonus.damageMult,
+            water: (tower.stats.extraWater || 0) * terrainMods.damageMult * auraBonus.damageMult,
+            wood: (tower.stats.extraWood || 0) * terrainMods.damageMult * auraBonus.damageMult,
         };
         if (tower.magicElement) {
             const baseVal = damage.base;
@@ -526,8 +545,10 @@ export class GameEngine {
     damageMob(mob, damageObj, tower, isCrit) {
         let totalDamage = 0;
         const globalCritDmgBonus = this.globalMasteries.critDmgAura ? 0.2 : 0;
-        const auraBonus = tower ? this.getBannerAuraBonuses(tower) : { critDmgBonus: 0 };
-        let critMult = isCrit ? ((tower?.stats?.critDmg || 2.0) + globalCritDmgBonus + (auraBonus.critDmgBonus || 0)) : 1.0;
+        const auraBonus = tower ? this.getBannerAuraBonuses(tower) : { critDmgBonus: 0, luckCritDmgBonus: 0 };
+        let critMult = isCrit
+            ? ((tower?.stats?.critDmg || 2.0) + globalCritDmgBonus + (auraBonus.critDmgBonus || 0) + (auraBonus.luckCritDmgBonus || 0))
+            : 1.0;
         if (isCrit && tower?.randomCritBonus) {
             critMult += (0.1 + (Math.random() * 9.9));
         }
@@ -598,6 +619,8 @@ export class GameEngine {
 
         if (!tower) return;
 
+        this.grantSupportExpFromNearbyKill(tower);
+
         if (tower.redistributeKillExp && this.towers.length > 1) {
             const others = this.towers.filter(t => t.id !== tower.id);
             const randomTower = others[Math.floor(Math.random() * others.length)];
@@ -622,6 +645,7 @@ export class GameEngine {
 
     applyTowerUpgrade(tower, upgradeType) {
         if (!tower || (tower.pendingUpgrades || 0) <= 0) return false;
+        if (tower.type === 'support' && !upgradeType.startsWith('support_')) return false;
 
         switch (upgradeType) {
             case 'fire_dmg':
@@ -663,6 +687,58 @@ export class GameEngine {
                 tower.speedMagicApplied = true;
                 tower.speedMagicLevel = (tower.speedMagicLevel || 0) + 1;
                 break;
+            case 'support_attack_aura_up':
+                if (tower.type !== 'support' || tower.supportAuraType !== 'attack') return false;
+                tower.supportAttackAuraLevel = (tower.supportAttackAuraLevel || 0) + 1;
+                break;
+            case 'support_speed_aura_up':
+                if (tower.type !== 'support' || tower.supportAuraType !== 'speed') return false;
+                tower.supportSpeedAuraLevel = (tower.supportSpeedAuraLevel || 0) + 1;
+                break;
+            case 'support_slow_aura_up':
+                if (tower.type !== 'support' || tower.supportAuraType !== 'slow') return false;
+                tower.supportSlowAuraLevel = (tower.supportSlowAuraLevel || 0) + 1;
+                break;
+            case 'support_crit_aura_up':
+                if (tower.type !== 'support' || tower.supportAuraType !== 'crit') return false;
+                tower.supportCritAuraLevel = (tower.supportCritAuraLevel || 0) + 1;
+                break;
+            case 'support_convert_speed_aura':
+                if (tower.type !== 'support' || tower.supportAuraType !== 'attack') return false;
+                tower.supportAuraType = 'speed';
+                break;
+            case 'support_convert_slow_aura':
+                if (tower.type !== 'support' || tower.supportAuraType !== 'attack') return false;
+                tower.supportAuraType = 'slow';
+                break;
+            case 'support_convert_crit_aura':
+                if (tower.type !== 'support' || tower.supportAuraType !== 'attack') return false;
+                tower.supportAuraType = 'crit';
+                break;
+            case 'support_aura_range_up':
+                if (tower.type !== 'support') return false;
+                tower.supportAuraRangeBonus = (tower.supportAuraRangeBonus || 0) + 1;
+                break;
+            case 'support_gain_level_book':
+                if (tower.type !== 'support') return false;
+                this.events?.onItemDrop?.('level_book', 1, 'support');
+                break;
+            case 'support_gain_speed_book':
+                if (tower.type !== 'support') return false;
+                this.events?.onItemDrop?.('speed_book', 1, 'support');
+                break;
+            case 'support_gain_power_book':
+                if (tower.type !== 'support') return false;
+                this.events?.onItemDrop?.('power_book', 1, 'support');
+                break;
+            case 'support_gain_crit_book':
+                if (tower.type !== 'support') return false;
+                this.events?.onItemDrop?.('crit_book', 1, 'support');
+                break;
+            case 'support_gain_gold_1000':
+                if (tower.type !== 'support') return false;
+                this.gold += 1000;
+                break;
             case 'trigger_magic':
                 if (!tower.magicElement) return false;
                 tower.triggerMagicLevel = (tower.triggerMagicLevel || 0) + 1;
@@ -689,6 +765,41 @@ export class GameEngine {
 
     applyTowerSpecialization(tower, specId) {
         if (!tower || !tower.pendingSpecialization || tower.specializationChosen) return false;
+
+        if (tower.type === 'support') {
+            switch (specId) {
+                case 'support_spec_level_books_10':
+                    this.events?.onItemDrop?.('level_book', 10, 'support_spec');
+                    break;
+                case 'support_spec_speed_books_10':
+                    this.events?.onItemDrop?.('speed_book', 10, 'support_spec');
+                    break;
+                case 'support_spec_power_books_10':
+                    this.events?.onItemDrop?.('power_book', 10, 'support_spec');
+                    break;
+                case 'support_spec_crit_books_10':
+                    this.events?.onItemDrop?.('crit_book', 10, 'support_spec');
+                    break;
+                case 'support_spec_double_aura':
+                    tower.supportAuraDouble = true;
+                    break;
+                case 'support_spec_range_5':
+                    tower.supportAuraRangeBonus = (tower.supportAuraRangeBonus || 0) + 5;
+                    break;
+                case 'support_spec_lucky_aura':
+                    tower.supportLuckyAura = true;
+                    tower.supportLuckyAuraTimer = 0;
+                    tower.supportLuckyCritDmgBonus = 0;
+                    break;
+                default:
+                    return false;
+            }
+
+            tower.pendingSpecialization = false;
+            tower.specializationChosen = true;
+            tower.specializationId = specId;
+            return true;
+        }
 
         switch (specId) {
             case 'spec_speed_aura':
@@ -796,7 +907,18 @@ export class GameEngine {
                 specializationId: null,
                 totalDamageDealt: 0,
                 equipmentId: null,
-                equipmentName: null
+                equipmentName: null,
+                supportExp: 0,
+                supportAuraType: typeId === 'support' ? 'attack' : null,
+                supportAttackAuraLevel: 0,
+                supportSpeedAuraLevel: 0,
+                supportSlowAuraLevel: 0,
+                supportCritAuraLevel: 0,
+                supportAuraRangeBonus: 0,
+                supportAuraDouble: false,
+                supportLuckyAura: false,
+                supportLuckyAuraTimer: 0,
+                supportLuckyCritDmgBonus: 0
             };
             this.towers.push(tower);
             return tower;
@@ -859,6 +981,40 @@ export class GameEngine {
 
     isArcherTower(tower) {
         return tower?.stats?.type === 'projectile';
+    }
+
+    isSupportTower(tower) {
+        return tower?.type === 'support' || tower?.stats?.type === 'support';
+    }
+
+    getSupportAuraRange(tower) {
+        return 1 + (tower?.supportAuraRangeBonus || 0);
+    }
+
+    getSupportAuraEffectPct(tower) {
+        if (!this.isSupportTower(tower)) return 0;
+
+        const auraType = tower.supportAuraType || 'attack';
+        let level = 0;
+        if (auraType === 'attack') level = tower.supportAttackAuraLevel || 0;
+        if (auraType === 'speed') level = tower.supportSpeedAuraLevel || 0;
+        if (auraType === 'slow') level = tower.supportSlowAuraLevel || 0;
+        if (auraType === 'crit') level = tower.supportCritAuraLevel || 0;
+
+        let pct = 0.15 + (level * 0.15);
+        if (tower.supportAuraDouble) pct *= 2;
+        return pct;
+    }
+
+    updateSupportAuraState(dt) {
+        for (const tower of this.towers) {
+            if (!this.isSupportTower(tower) || !tower.supportLuckyAura) continue;
+            tower.supportLuckyAuraTimer = (tower.supportLuckyAuraTimer || 0) - dt;
+            if (tower.supportLuckyAuraTimer <= 0) {
+                tower.supportLuckyAuraTimer = 1;
+                tower.supportLuckyCritDmgBonus = Math.round((Math.random() * 2) * 100) / 100;
+            }
+        }
     }
 
     getTowerTerrainModifiers(tower) {
@@ -1013,6 +1169,7 @@ export class GameEngine {
 
     grantTowerKill(tower) {
         if (!tower) return;
+        if (this.isSupportTower(tower)) return;
         tower.kills++;
         if (tower.kills >= 10 && tower.level < 15) {
             tower.kills = 0;
@@ -1072,6 +1229,10 @@ export class GameEngine {
                 tower.stats.damage *= 1.1;
                 return { ok: true, message: `${item.name} 已使用` };
             }
+            if (itemId === 'crit_book') {
+                tower.stats.crit = Math.min(1, (tower.stats.crit || 0) + 0.1);
+                return { ok: true, message: `${item.name} 已使用` };
+            }
             return { ok: false, message: '此消耗道具尚未實作' };
         }
 
@@ -1081,12 +1242,26 @@ export class GameEngine {
             }
 
             if (itemId === 'lubricant') {
-                tower.stats.speed = 1;
+                const towerDef = Object.values(TOWER_TYPES).find((t) => t.id === tower.type) || TOWER_TYPES.MELEE;
+                const typeBaseSpeed = towerDef?.stats?.speed || 1;
+                const talentSpeedMult = 1 + this.getTalentValue('tower_atk_speed');
+                const previousBaseWithTalent = Math.max(0.0001, typeBaseSpeed * talentSpeedMult);
+                const existingBonusMult = Math.max(0, (tower.stats.speed || 0) / previousBaseWithTalent);
+                tower.stats.speed = talentSpeedMult * existingBonusMult;
+            } else if (itemId === 'full_firepower') {
+                const towerDef = Object.values(TOWER_TYPES).find((t) => t.id === tower.type) || TOWER_TYPES.MELEE;
+                const typeBaseDamage = towerDef?.stats?.damage || 1;
+                const talentBaseBonus = this.getTalentValue('tower_dmg_base');
+                const talentAttrMult = 1 + this.getTalentValue('tower_attr_dmg');
+                const previousBaseWithTalent = Math.max(0.0001, (typeBaseDamage + talentBaseBonus) * talentAttrMult);
+                const existingBonusMult = Math.max(0, (tower.stats.damage || 0) / previousBaseWithTalent);
+                tower.stats.damage = Math.max(0, (40 + talentBaseBonus) * talentAttrMult * existingBonusMult);
             } else if (
                 itemId !== 'chain_lightning'
                 && itemId !== 'courage_banner'
                 && itemId !== 'slaughter_banner'
                 && itemId !== 'agility_banner'
+                && itemId !== 'full_firepower'
             ) {
                 return { ok: false, message: '此裝備尚未實作' };
             }
@@ -1103,11 +1278,16 @@ export class GameEngine {
         const result = {
             critChance: 0,
             critDmgBonus: 0,
-            speedPct: 0
+            speedPct: 0,
+            damageMult: 1,
+            luckCritDmgBonus: 0
         };
 
-        if (!targetTower) return result;
-        const radiusSq = 3 * 3;
+        if (!targetTower || this.isSupportTower(targetTower)) return result;
+        const bannerRadiusSq = 3 * 3;
+        let supportDamagePct = 0;
+        let supportSpeedPct = 0;
+        let supportCritPct = 0;
 
         for (const sourceTower of this.towers) {
             if (!sourceTower?.equipmentId) continue;
@@ -1119,7 +1299,7 @@ export class GameEngine {
 
             const dx = sourceTower.x - targetTower.x;
             const dy = sourceTower.y - targetTower.y;
-            if ((dx * dx + dy * dy) > radiusSq) continue;
+            if ((dx * dx + dy * dy) > bannerRadiusSq) continue;
 
             if (sourceTower.equipmentId === 'courage_banner') {
                 result.critChance += 0.25;
@@ -1130,7 +1310,142 @@ export class GameEngine {
             }
         }
 
+        for (const sourceTower of this.towers) {
+            if (!this.isSupportTower(sourceTower)) continue;
+            if (sourceTower.id === targetTower.id) continue;
+
+            const range = this.getSupportAuraRange(sourceTower);
+            const dx = sourceTower.x - targetTower.x;
+            const dy = sourceTower.y - targetTower.y;
+            if ((dx * dx + dy * dy) > (range * range)) continue;
+
+            const pct = this.getSupportAuraEffectPct(sourceTower);
+            if ((sourceTower.supportAuraType || 'attack') === 'attack') {
+                supportDamagePct += pct;
+            } else if (sourceTower.supportAuraType === 'speed') {
+                supportSpeedPct += pct;
+            } else if (sourceTower.supportAuraType === 'crit') {
+                supportCritPct += pct;
+            }
+
+            if (sourceTower.supportLuckyAura) {
+                result.luckCritDmgBonus += sourceTower.supportLuckyCritDmgBonus || 0;
+            }
+        }
+
+        result.damageMult = Math.max(0, 1 + supportDamagePct);
+        result.speedPct += supportSpeedPct;
+        result.critChance += supportCritPct;
+
         return result;
+    }
+
+    getSupportSlowPctForMob(mob) {
+        if (!mob) return 0;
+        let totalSlowPct = 0;
+
+        for (const tower of this.towers) {
+            if (!this.isSupportTower(tower)) continue;
+            if (tower.supportAuraType !== 'slow') continue;
+
+            const range = this.getSupportAuraRange(tower);
+            const dx = tower.x - mob.x;
+            const dy = tower.y - mob.y;
+            if ((dx * dx + dy * dy) > (range * range)) continue;
+
+            totalSlowPct += this.getSupportAuraEffectPct(tower);
+        }
+
+        return Math.min(0.95, Math.max(0, totalSlowPct));
+    }
+
+    getTowerAuraSnapshot(targetTower) {
+        if (!targetTower) {
+            return {
+                damagePct: 0,
+                speedPct: 0,
+                critChancePct: 0,
+                critDmgBonus: 0,
+                bannerCritDmgBonus: 0,
+                luckCritDmgBonus: 0
+            };
+        }
+
+        const bonus = this.getBannerAuraBonuses(targetTower);
+        return {
+            damagePct: Math.max(0, (bonus.damageMult - 1) * 100),
+            speedPct: (bonus.speedPct || 0) * 100,
+            critChancePct: (bonus.critChance || 0) * 100,
+            critDmgBonus: (bonus.critDmgBonus || 0) + (bonus.luckCritDmgBonus || 0),
+            bannerCritDmgBonus: bonus.critDmgBonus || 0,
+            luckCritDmgBonus: bonus.luckCritDmgBonus || 0
+        };
+    }
+
+    getSupportAuraStatus(sourceTower) {
+        if (!this.isSupportTower(sourceTower)) {
+            return {
+                auraType: null,
+                effectPct: 0,
+                range: 0,
+                affectedTowerCount: 0,
+                affectedMobCount: 0,
+                luckyCritDmgBonus: 0
+            };
+        }
+
+        const auraType = sourceTower.supportAuraType || 'attack';
+        const range = this.getSupportAuraRange(sourceTower);
+        const rangeSq = range * range;
+        let affectedTowerCount = 0;
+        let affectedMobCount = 0;
+
+        for (const tower of this.towers) {
+            if (!tower || tower.id === sourceTower.id || this.isSupportTower(tower)) continue;
+            const dx = sourceTower.x - tower.x;
+            const dy = sourceTower.y - tower.y;
+            if ((dx * dx + dy * dy) <= rangeSq) {
+                affectedTowerCount += 1;
+            }
+        }
+
+        if (auraType === 'slow') {
+            for (const mob of this.mobs) {
+                const dx = sourceTower.x - mob.x;
+                const dy = sourceTower.y - mob.y;
+                if ((dx * dx + dy * dy) <= rangeSq) {
+                    affectedMobCount += 1;
+                }
+            }
+        }
+
+        return {
+            auraType,
+            effectPct: this.getSupportAuraEffectPct(sourceTower) * 100,
+            range,
+            affectedTowerCount,
+            affectedMobCount,
+            luckyCritDmgBonus: sourceTower.supportLuckyAura ? (sourceTower.supportLuckyCritDmgBonus || 0) : 0
+        };
+    }
+
+    grantSupportExpFromNearbyKill(killerTower) {
+        if (!killerTower || this.isSupportTower(killerTower)) return;
+
+        for (const tower of this.towers) {
+            if (!this.isSupportTower(tower)) continue;
+
+            const range = this.getSupportAuraRange(tower);
+            const dx = tower.x - killerTower.x;
+            const dy = tower.y - killerTower.y;
+            if ((dx * dx + dy * dy) > (range * range)) continue;
+
+            tower.supportExp = (tower.supportExp || 0) + 1;
+            while ((tower.supportExp || 0) >= 15 && tower.level < 15) {
+                tower.supportExp -= 15;
+                this.levelUpTower(tower, 1);
+            }
+        }
     }
 
     applySlowArea(primaryTarget, sourceTower) {

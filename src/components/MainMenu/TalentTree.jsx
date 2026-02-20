@@ -153,7 +153,7 @@ const TalentSection = ({ title, talentIds, compact = false }) => (
         gap: '8px'
     }}>
         <h3 style={{ textAlign: 'left', fontSize: compact ? '0.9rem' : '0.95rem', letterSpacing: '0.02em', margin: 0 }}>{title}</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(auto-fit, minmax(190px, 1fr))', gap: '8px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
             {talentIds.map((talentId) => <TalentNode key={talentId} talentId={talentId} compact={compact} />)}
         </div>
     </section>
@@ -164,6 +164,7 @@ const TalentTree = ({ onBack }) => {
     const [viewportWidth, setViewportWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1280);
     const [activeCategoryId, setActiveCategoryId] = useState(TALENT_CATEGORIES[0]?.id || '');
     const isMobile = viewportWidth <= 900;
+    const desktopColumnCount = viewportWidth >= 1500 ? 2 : 1;
 
     useEffect(() => {
         const onResize = () => setViewportWidth(window.innerWidth);
@@ -172,7 +173,17 @@ const TalentTree = ({ onBack }) => {
     }, []);
 
     return (
-        <div style={{ padding: isMobile ? '8px' : '12px', height: '100%', display: 'flex', flexDirection: 'column', gap: '10px', overflow: 'hidden' }}>
+        <div style={{
+            padding: isMobile ? '8px' : '12px',
+            height: '100%',
+            width: 'min(1500px, 100vw)',
+            maxWidth: '100%',
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            overflow: 'hidden'
+        }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
                 <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <ArrowLeft size={16} />
@@ -210,10 +221,11 @@ const TalentTree = ({ onBack }) => {
             {!isMobile && (
                 <div style={{
                     flex: 1,
-                    overflow: 'hidden',
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                    gridAutoRows: 'minmax(0, 1fr)',
+                    gridTemplateColumns: `repeat(${desktopColumnCount}, minmax(0, 1fr))`,
+                    gridAutoRows: 'min-content',
                     gap: '10px',
                     alignContent: 'stretch'
                 }}>

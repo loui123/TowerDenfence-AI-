@@ -28,12 +28,28 @@ export const ITEM_DEFS = {
         icon: '力',
         source: 'fire'
     },
+    crit_book: {
+        id: 'crit_book',
+        name: '暴擊之書',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '塔暴擊機率 +10%',
+        icon: '暴',
+        source: 'all'
+    },
     lubricant: {
         id: 'lubricant',
         name: '潤滑油',
         type: ITEM_TYPES.EQUIPMENT,
         description: '裝備後將塔的基礎攻擊速度改為 1（不可卸下）',
         icon: '油',
+        source: 'all'
+    },
+    full_firepower: {
+        id: 'full_firepower',
+        name: '火力全開',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '裝備後將塔的基礎攻擊力改為 40（不可卸下）',
+        icon: '火',
         source: 'all'
     },
     chain_lightning: {
@@ -74,6 +90,7 @@ export const MONSTER_ITEM_DROP_TABLE = {
     fire: [
         { itemId: 'power_book', chance: 0.02 },
         { itemId: 'lubricant', chance: 0.004 },
+        { itemId: 'full_firepower', chance: 0.004 },
         { itemId: 'chain_lightning', chance: 0.002 },
         { itemId: 'courage_banner', chance: 0.002 },
         { itemId: 'slaughter_banner', chance: 0.002 },
@@ -82,6 +99,7 @@ export const MONSTER_ITEM_DROP_TABLE = {
     water: [
         { itemId: 'level_book', chance: 0.01 },
         { itemId: 'lubricant', chance: 0.004 },
+        { itemId: 'full_firepower', chance: 0.004 },
         { itemId: 'chain_lightning', chance: 0.002 },
         { itemId: 'courage_banner', chance: 0.002 },
         { itemId: 'slaughter_banner', chance: 0.002 },
@@ -90,6 +108,7 @@ export const MONSTER_ITEM_DROP_TABLE = {
     wood: [
         { itemId: 'speed_book', chance: 0.01 },
         { itemId: 'lubricant', chance: 0.004 },
+        { itemId: 'full_firepower', chance: 0.004 },
         { itemId: 'chain_lightning', chance: 0.002 },
         { itemId: 'courage_banner', chance: 0.002 },
         { itemId: 'slaughter_banner', chance: 0.002 },
@@ -97,6 +116,7 @@ export const MONSTER_ITEM_DROP_TABLE = {
     ],
     normal: [
         { itemId: 'lubricant', chance: 0.004 },
+        { itemId: 'full_firepower', chance: 0.004 },
         { itemId: 'chain_lightning', chance: 0.002 },
         { itemId: 'courage_banner', chance: 0.002 },
         { itemId: 'slaughter_banner', chance: 0.002 },

@@ -50,12 +50,39 @@ const SPECIALIZATION_POOL = [
     { id: 'spec_tower_half_dmg_double_speed', label: '高速連擊', desc: '基礎傷害減半，攻速翻倍' }
 ];
 
+const SUPPORT_UPGRADE_POOL = [
+    { id: 'support_attack_aura_up', label: '強化攻擊靈氣效果', desc: '攻擊靈氣效果每級 +15%', requireAura: 'attack' },
+    { id: 'support_speed_aura_up', label: '強化速度靈氣效果', desc: '速度靈氣效果每級 +15%', requireAura: 'speed' },
+    { id: 'support_slow_aura_up', label: '強化緩速靈氣效果', desc: '緩速靈氣效果每級 +15%', requireAura: 'slow' },
+    { id: 'support_crit_aura_up', label: '強化暴擊靈氣效果', desc: '暴擊靈氣效果每級 +15%', requireAura: 'crit' },
+    { id: 'support_convert_speed_aura', label: '轉換為速度靈氣', desc: '將攻擊靈氣轉為速度靈氣（僅一次）', requireAura: 'attack', isConvert: true },
+    { id: 'support_convert_slow_aura', label: '轉換為緩速靈氣', desc: '將攻擊靈氣轉為緩速靈氣（僅一次）', requireAura: 'attack', isConvert: true },
+    { id: 'support_convert_crit_aura', label: '轉換為暴擊靈氣', desc: '將攻擊靈氣轉為暴擊靈氣（僅一次）', requireAura: 'attack', isConvert: true },
+    { id: 'support_aura_range_up', label: '範圍增加 1 格', desc: '當前靈氣範圍 +1' },
+    { id: 'support_gain_level_book', label: '獲得經驗之書 x1', desc: '立即獲得 1 本經驗之書' },
+    { id: 'support_gain_speed_book', label: '獲得速度之書 x1', desc: '立即獲得 1 本速度之書' },
+    { id: 'support_gain_power_book', label: '獲得力量之書 x1', desc: '立即獲得 1 本力量之書' },
+    { id: 'support_gain_crit_book', label: '獲得暴擊之書 x1', desc: '立即獲得 1 本暴擊之書' },
+    { id: 'support_gain_gold_1000', label: '獲得金幣 1000', desc: '立即獲得 1000 金幣' }
+];
+
+const SUPPORT_SPECIALIZATION_POOL = [
+    { id: 'support_spec_level_books_10', label: '經驗之書 x10', desc: '立即獲得 10 本經驗之書' },
+    { id: 'support_spec_speed_books_10', label: '速度之書 x10', desc: '立即獲得 10 本速度之書' },
+    { id: 'support_spec_power_books_10', label: '力量之書 x10', desc: '立即獲得 10 本力量之書' },
+    { id: 'support_spec_crit_books_10', label: '暴擊之書 x10', desc: '立即獲得 10 本暴擊之書' },
+    { id: 'support_spec_double_aura', label: '靈氣效果翻倍', desc: '當前塔的靈氣效果提升一倍' },
+    { id: 'support_spec_range_5', label: '靈氣範圍 +5', desc: '當前塔的靈氣範圍增加五格' },
+    { id: 'support_spec_lucky_aura', label: '幸運靈氣', desc: '附近塔暴擊傷害每秒隨機增加 0~2 倍' }
+];
+
 const TOWER_SHORT_LABEL = {
     melee: '近',
     projectile: '弓',
     projectile_slow: '緩',
     projectile_aoe: '砲',
-    magic: '法'
+    magic: '法',
+    support: '輔'
 };
 
 const TERRAIN_META = {
@@ -136,6 +163,7 @@ const getTowerName = (typeId) => {
     if (typeId === 'projectile_slow') return '緩速塔';
     if (typeId === 'projectile_aoe') return '砲擊塔';
     if (typeId === 'magic') return '法術塔';
+    if (typeId === 'support') return '輔助塔';
     return '塔';
 };
 const isMeleeTower = (tower) => tower?.type === 'melee';
@@ -143,6 +171,7 @@ const isProjectileTower = (tower) => tower?.stats?.type === 'projectile';
 const isSlowTower = (tower) => tower?.type === 'projectile_slow';
 const isArtilleryTower = (tower) => tower?.type === 'projectile_aoe';
 const isMagicTower = (tower) => tower?.type === 'magic';
+const isSupportTower = (tower) => tower?.type === 'support' || tower?.stats?.type === 'support';
 
 const lerp = (a, b, t) => Math.round(a + (b - a) * t);
 
@@ -158,9 +187,11 @@ const getTowerLevelColor = (level) => {
 const getTerrainLabel = (terrain) => TERRAIN_META[terrain]?.name || '無';
 const getTerrainEffectText = (terrain) => TERRAIN_META[terrain]?.description || '無特殊效果';
 const getTerrainImage = (terrain) => TERRAIN_META[terrain]?.image || 'none';
-const UPGRADE_OPTION_MAP = Object.fromEntries(UPGRADE_POOL.map((x) => [x.id, x]));
-const UPGRADE_LABEL_MAP = Object.fromEntries(UPGRADE_POOL.map((x) => [x.id, x.label]));
-const SPECIALIZATION_LABEL_MAP = Object.fromEntries(SPECIALIZATION_POOL.map((x) => [x.id, x.label]));
+const ALL_UPGRADE_POOL = [...UPGRADE_POOL, ...SUPPORT_UPGRADE_POOL];
+const ALL_SPECIALIZATION_POOL = [...SPECIALIZATION_POOL, ...SUPPORT_SPECIALIZATION_POOL];
+const UPGRADE_OPTION_MAP = Object.fromEntries(ALL_UPGRADE_POOL.map((x) => [x.id, x]));
+const UPGRADE_LABEL_MAP = Object.fromEntries(ALL_UPGRADE_POOL.map((x) => [x.id, x.label]));
+const SPECIALIZATION_LABEL_MAP = Object.fromEntries(ALL_SPECIALIZATION_POOL.map((x) => [x.id, x.label]));
 const BGM_PATTERN = [52, 55, 59, 55, 60, 59, 55, 52, 50, 52, 55, 57, 55, 52, 50, 48];
 
 const Game = ({ onExit }) => {
@@ -712,6 +743,16 @@ const Game = ({ onExit }) => {
         return engineRef.current.getTowerAt(hoverTowerPos.x, hoverTowerPos.y);
     }, [hoverTowerPos, gameState.pendingUpgradePoints, gameState.mobsCount]);
 
+    const upgradeAuraSnapshot = useMemo(() => {
+        if (!upgradeTower || !engineRef.current) return null;
+        return engineRef.current.getTowerAuraSnapshot?.(upgradeTower) || null;
+    }, [upgradeTower, gameState.mobsCount, gameState.pendingUpgradePoints]);
+
+    const upgradeSupportAuraStatus = useMemo(() => {
+        if (!upgradeTower || !engineRef.current || !isSupportTower(upgradeTower)) return null;
+        return engineRef.current.getSupportAuraStatus?.(upgradeTower) || null;
+    }, [upgradeTower, gameState.mobsCount, gameState.pendingUpgradePoints]);
+
     const buildCell = useMemo(() => {
         if (!buildTarget) return null;
         return grid[buildTarget.y]?.[buildTarget.x] || null;
@@ -751,6 +792,15 @@ const Game = ({ onExit }) => {
     const buildUpgradeChoices = (tower) => {
         if (!tower) return [];
 
+        if (isSupportTower(tower)) {
+            const filtered = SUPPORT_UPGRADE_POOL.filter((option) => {
+                if (option.requireAura && option.requireAura !== (tower.supportAuraType || 'attack')) return false;
+                if (option.isConvert && (tower.supportAuraType || 'attack') !== 'attack') return false;
+                return true;
+            });
+            return shuffle(filtered).slice(0, 3);
+        }
+
         const filtered = UPGRADE_POOL.filter((option) => {
             if (isMagicTower(tower) && !option.onlyMagic) return false;
             if (!isMagicTower(tower) && option.onlyMagic) return false;
@@ -784,6 +834,9 @@ const Game = ({ onExit }) => {
 
     const getSpecializationChoices = (tower) => {
         if (!tower) return [];
+        if (isSupportTower(tower)) {
+            return shuffle(SUPPORT_SPECIALIZATION_POOL).slice(0, 3);
+        }
         const globalMasteries = engineRef.current?.globalMasteries || {};
 
         const filtered = SPECIALIZATION_POOL.filter((option) => {
@@ -1002,6 +1055,17 @@ const Game = ({ onExit }) => {
         if (!hoveredTower) return null;
         const typeDef = Object.values(TOWER_TYPES).find((t) => t.id === hoveredTower.type);
         const baseStats = typeDef?.stats || {};
+        const auraSnapshot = engine?.getTowerAuraSnapshot?.(hoveredTower) || {
+            damagePct: 0,
+            speedPct: 0,
+            critChancePct: 0,
+            critDmgBonus: 0,
+            bannerCritDmgBonus: 0,
+            luckCritDmgBonus: 0
+        };
+        const supportAuraStatus = isSupportTower(hoveredTower)
+            ? (engine?.getSupportAuraStatus?.(hoveredTower) || null)
+            : null;
 
         const initialDamage = baseStats.damage || 0;
         const currentBaseDamage = hoveredTower.stats?.damage || 0;
@@ -1053,21 +1117,32 @@ const Game = ({ onExit }) => {
             initialRange,
             extraRange,
             equipmentName: hoveredTower.equipmentName || null,
-            talentRows: [...specRows, ...upgradeRows]
+            talentRows: [...specRows, ...upgradeRows],
+            auraSnapshot,
+            supportAuraStatus
         };
-    }, [hoveredTower]);
+    }, [engine, hoveredTower]);
 
     const towerRows = engine
-        ? [...engine.towers].map((tower) => ({
-            id: tower.id,
-            name: getTowerName(tower.type),
-            level: tower.level || 1,
-            pendingUpgrades: tower.pendingUpgrades || 0,
-            pendingSpecialization: !!tower.pendingSpecialization,
-            kills: tower.kills || 0,
-            damage: Math.floor(tower.totalDamageDealt || 0),
-            equipmentName: tower.equipmentName || null
-        }))
+        ? [...engine.towers].map((tower) => {
+            const auraSnapshot = engine.getTowerAuraSnapshot?.(tower) || null;
+            const supportAuraStatus = isSupportTower(tower) ? (engine.getSupportAuraStatus?.(tower) || null) : null;
+            return {
+                id: tower.id,
+                name: getTowerName(tower.type),
+                level: tower.level || 1,
+                pendingUpgrades: tower.pendingUpgrades || 0,
+                pendingSpecialization: !!tower.pendingSpecialization,
+                kills: tower.kills || 0,
+                supportExp: tower.supportExp || 0,
+                supportAuraType: tower.supportAuraType || null,
+                supportAuraRange: tower.type === 'support' ? (1 + (tower.supportAuraRangeBonus || 0)) : null,
+                damage: Math.floor(tower.totalDamageDealt || 0),
+                equipmentName: tower.equipmentName || null,
+                auraSnapshot,
+                supportAuraStatus
+            };
+        })
         : [];
 
     const towerRankRows = [...towerRows]
@@ -1301,6 +1376,32 @@ const Game = ({ onExit }) => {
                                     {' + '}
                                     ({hoveredTowerDetail.extraRange >= 0 ? '+' : ''}{hoveredTowerDetail.extraRange.toFixed(1)})
                                 </div>
+                                {!isSupportTower(hoveredTower) && (
+                                    <>
+                                        <div style={{ color: '#ffd99b' }}>
+                                            靈氣加成: 傷害 +{hoveredTowerDetail.auraSnapshot.damagePct.toFixed(0)}% | 攻速 +{hoveredTowerDetail.auraSnapshot.speedPct.toFixed(0)}%
+                                        </div>
+                                        <div style={{ color: '#ffd99b' }}>
+                                            靈氣加成: 暴擊率 +{hoveredTowerDetail.auraSnapshot.critChancePct.toFixed(0)}% | 暴傷 +{hoveredTowerDetail.auraSnapshot.critDmgBonus.toFixed(2)}
+                                        </div>
+                                    </>
+                                )}
+                                {isSupportTower(hoveredTower) && hoveredTowerDetail.supportAuraStatus && (
+                                    <>
+                                        <div style={{ color: '#8de8df' }}>
+                                            輔助靈氣: {hoveredTowerDetail.supportAuraStatus.auraType} | 效果 +{hoveredTowerDetail.supportAuraStatus.effectPct.toFixed(0)}%
+                                        </div>
+                                        <div style={{ color: '#8de8df' }}>
+                                            範圍: {hoveredTowerDetail.supportAuraStatus.range.toFixed(1)} | 影響塔: {hoveredTowerDetail.supportAuraStatus.affectedTowerCount}
+                                            {hoveredTowerDetail.supportAuraStatus.auraType === 'slow' ? ` | 影響怪: ${hoveredTowerDetail.supportAuraStatus.affectedMobCount}` : ''}
+                                        </div>
+                                        {hoveredTower.supportLuckyAura && (
+                                            <div style={{ color: '#8de8df' }}>
+                                                幸運靈氣: +{hoveredTowerDetail.supportAuraStatus.luckyCritDmgBonus.toFixed(2)} 暴傷
+                                            </div>
+                                        )}
+                                    </>
+                                )}
                                 </div>
 
                                 <div style={{ borderTop: '1px solid #3a3a3a', paddingTop: '8px', overflow: 'auto' }}>
@@ -1329,9 +1430,24 @@ const Game = ({ onExit }) => {
                             towerRows.map((row) => (
                                 <div key={row.id} style={{ borderBottom: '1px solid #2f2f2f', padding: '6px 0', fontSize: '0.9rem', lineHeight: 1.35 }}>
                                     <div style={{ color: '#f0f0f0' }}>{row.name} Lv.{row.level}</div>
-                                    <div style={{ color: '#bcbcbc' }}>
-                                        待升級: {row.pendingUpgrades} | 待專精: {row.pendingSpecialization ? '是' : '否'} | K: {row.kills} | Dmg: {row.damage}
-                                    </div>
+                                    {row.supportAuraType ? (
+                                        <div style={{ color: '#bcbcbc' }}>
+                                            待升級: {row.pendingUpgrades} | 待專精: {row.pendingSpecialization ? '是' : '否'} | EXP: {row.supportExp}/15 | 靈氣: {row.supportAuraType} | 範圍: {row.supportAuraRange}
+                                        </div>
+                                    ) : (
+                                        <div style={{ color: '#bcbcbc' }}>
+                                            待升級: {row.pendingUpgrades} | 待專精: {row.pendingSpecialization ? '是' : '否'} | K: {row.kills} | Dmg: {row.damage}
+                                        </div>
+                                    )}
+                                    {row.supportAuraStatus ? (
+                                        <div style={{ color: '#8de8df' }}>
+                                            靈氣效果 +{(row.supportAuraStatus.effectPct || 0).toFixed(0)}% | 影響塔 {row.supportAuraStatus.affectedTowerCount || 0}
+                                        </div>
+                                    ) : (
+                                        <div style={{ color: '#ffd99b' }}>
+                                            靈氣加成: 傷 +{(row.auraSnapshot?.damagePct || 0).toFixed(0)}% | 速 +{(row.auraSnapshot?.speedPct || 0).toFixed(0)}% | 暴 +{(row.auraSnapshot?.critChancePct || 0).toFixed(0)}%
+                                        </div>
+                                    )}
                                     {row.equipmentName && (
                                         <div style={{ color: '#9ad7ff' }}>裝備: {row.equipmentName}</div>
                                     )}
@@ -1507,7 +1623,7 @@ const Game = ({ onExit }) => {
                                     >
                                     <div style={{ fontWeight: 700 }}>{getTowerLabel(type.id)} 塔</div>
                                     <div>
-                                        花費: {type.cost} | 型態: {type.stats.type === 'projectile' ? '投射物' : (type.stats.type === 'magic' ? '法術' : '近戰')}
+                                        花費: {type.cost} | 型態: {type.stats.type === 'projectile' ? '投射物' : (type.stats.type === 'magic' ? '法術' : (type.stats.type === 'support' ? '輔助' : '近戰'))}
                                     </div>
                                         <div style={{ color: '#cfd6df' }}>傷害: {type.stats.damage} | 攻速: {type.stats.speed.toFixed(2)}</div>
                                         <div style={{ color: '#cfd6df' }}>距離: {type.stats.range} | 暴擊: {(type.stats.crit * 100).toFixed(0)}%</div>
@@ -1542,11 +1658,28 @@ const Game = ({ onExit }) => {
                                 <div>地形: {getTerrainLabel(upgradeCell?.terrain)}</div>
                                 <div>地形效果: {getTerrainEffectText(upgradeCell?.terrain)}</div>
                                 <div>塔等級: {upgradeTower.level}</div>
-                                <div>擊殺計數: {upgradeTower.kills}/10</div>
-                                <div>基礎傷害: {Math.floor(upgradeTower.stats.damage)}</div>
-                                <div>攻速: {upgradeTower.stats.speed.toFixed(2)}</div>
-                                <div>暴擊率: {(upgradeTower.stats.crit * 100).toFixed(0)}%</div>
-                                <div>攻擊距離: {upgradeTower.stats.range.toFixed(1)}</div>
+                                {isSupportTower(upgradeTower) ? (
+                                    <>
+                                        <div>輔助經驗: {upgradeTower.supportExp || 0}/15</div>
+                                        <div>靈氣型態: {upgradeTower.supportAuraType || 'attack'}</div>
+                                        <div>靈氣範圍: {(1 + (upgradeTower.supportAuraRangeBonus || 0)).toFixed(1)}</div>
+                                        <div>靈氣效果: +{(upgradeSupportAuraStatus?.effectPct || 0).toFixed(0)}%</div>
+                                        <div>影響塔數: {upgradeSupportAuraStatus?.affectedTowerCount || 0}</div>
+                                        <div>幸運靈氣: {upgradeTower.supportLuckyAura ? `+${(upgradeTower.supportLuckyCritDmgBonus || 0).toFixed(2)} 暴傷` : '未啟用'}</div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div>擊殺計數: {upgradeTower.kills}/10</div>
+                                        <div>基礎傷害: {Math.floor(upgradeTower.stats.damage)}</div>
+                                        <div>攻速: {upgradeTower.stats.speed.toFixed(2)}</div>
+                                        <div>暴擊率: {(upgradeTower.stats.crit * 100).toFixed(0)}%</div>
+                                        <div>攻擊距離: {upgradeTower.stats.range.toFixed(1)}</div>
+                                        <div>靈氣傷害加成: +{(upgradeAuraSnapshot?.damagePct || 0).toFixed(0)}%</div>
+                                        <div>靈氣攻速加成: +{(upgradeAuraSnapshot?.speedPct || 0).toFixed(0)}%</div>
+                                        <div>靈氣暴擊加成: +{(upgradeAuraSnapshot?.critChancePct || 0).toFixed(0)}%</div>
+                                        <div>靈氣暴傷加成: +{(upgradeAuraSnapshot?.critDmgBonus || 0).toFixed(2)}</div>
+                                    </>
+                                )}
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', flex: 1 }}>
                                 {upgradeOptions.map((opt) => (
@@ -1893,6 +2026,9 @@ const Game = ({ onExit }) => {
                                     towerRows.slice(0, 4).map((row) => (
                                         <div key={`mobile-tower-${row.id}`}>
                                             {row.name} Lv.{row.level} | 升級 {row.pendingUpgrades} | 專精 {row.pendingSpecialization ? '是' : '否'}
+                                            {row.supportAuraType
+                                                ? ` | 靈氣 ${row.supportAuraType} +${(row.supportAuraStatus?.effectPct || 0).toFixed(0)}%`
+                                                : ` | 靈氣傷 +${(row.auraSnapshot?.damagePct || 0).toFixed(0)}%`}
                                         </div>
                                     ))
                                 )
