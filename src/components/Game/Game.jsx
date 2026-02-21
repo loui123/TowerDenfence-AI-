@@ -166,6 +166,21 @@ const getTowerName = (typeId) => {
     if (typeId === 'support') return '輔助塔';
     return '塔';
 };
+const TERRAIN_TILE_MAP = {
+    highland: '/tiles/terrain_highland.svg',
+    forest: '/tiles/terrain_forest.svg',
+    plain: '/tiles/terrain_plain.svg',
+    swamp: '/tiles/terrain_swamp.svg',
+    desert: '/tiles/terrain_desert.svg',
+    rocky: '/tiles/terrain_rocky.svg',
+    ruins: '/tiles/terrain_ruins.svg'
+};
+const CELL_TILE_MAP = {
+    start: '/tiles/cell_start.svg',
+    end: '/tiles/cell_end.svg',
+    path: '/tiles/cell_path.svg',
+    obstacle: '/tiles/cell_obstacle.svg'
+};
 const isMeleeTower = (tower) => tower?.type === 'melee';
 const isProjectileTower = (tower) => tower?.stats?.type === 'projectile';
 const isSlowTower = (tower) => tower?.type === 'projectile_slow';
@@ -186,7 +201,13 @@ const getTowerLevelColor = (level) => {
 
 const getTerrainLabel = (terrain) => TERRAIN_META[terrain]?.name || '無';
 const getTerrainEffectText = (terrain) => TERRAIN_META[terrain]?.description || '無特殊效果';
-const getTerrainImage = (terrain) => TERRAIN_META[terrain]?.image || 'none';
+const getTerrainImage = (terrain) => TERRAIN_TILE_MAP[terrain] || null;
+const getCellTexture = (cell) => {
+    if (!cell) return null;
+    if (cell.type === 'build') return getTerrainImage(cell.terrain) || '/tiles/cell_build.svg';
+    if (CELL_TILE_MAP[cell.type]) return CELL_TILE_MAP[cell.type];
+    return getTerrainImage(cell.terrain) || '/tiles/cell_build.svg';
+};
 const ALL_UPGRADE_POOL = [...UPGRADE_POOL, ...SUPPORT_UPGRADE_POOL];
 const ALL_SPECIALIZATION_POOL = [...SPECIALIZATION_POOL, ...SUPPORT_SPECIALIZATION_POOL];
 const UPGRADE_OPTION_MAP = Object.fromEntries(ALL_UPGRADE_POOL.map((x) => [x.id, x]));
@@ -1524,6 +1545,7 @@ const Game = ({ onExit }) => {
                             const tower = cell.type === 'tower' && engineRef.current
                                 ? engineRef.current.getTowerAt(x, y)
                                 : null;
+                            const cellTexture = getCellTexture(cell);
                             const pendingUpgrades = tower ? (tower.pendingUpgrades || 0) : 0;
                             const pendingSpecs = tower?.pendingSpecialization ? 1 : 0;
                             const pending = pendingUpgrades + pendingSpecs;
@@ -1539,9 +1561,17 @@ const Game = ({ onExit }) => {
                                         width: CELL_SIZE,
                                         height: CELL_SIZE,
                                         backgroundColor: getCellColor(cell),
-                                        backgroundImage: getTerrainImage(cell.terrain),
+                                        backgroundImage: cellTexture
+                                            ? (
+                                                cell.type === 'build'
+                                                    ? `linear-gradient(rgba(16,16,16,0.36), rgba(16,16,16,0.36)), url(${cellTexture})`
+                                                    : `url(${cellTexture})`
+                                            )
+                                            : 'none',
                                         backgroundSize: 'cover',
-                                        backgroundBlendMode: 'screen',
+                                        backgroundBlendMode: 'normal',
+                                        opacity: cell.type === 'build' ? 0.72 : 1,
+                                        filter: cell.type === 'build' ? 'saturate(0.58) brightness(0.9)' : 'none',
                                         border: '1px solid #333',
                                         cursor: (cell.type === 'build' || (cell.type === 'tower' && (isReady || !!selectedInventoryItem))) ? 'pointer' : 'default',
                                         position: 'relative',
