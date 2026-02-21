@@ -18,6 +18,7 @@
 
 ### 3.1 normal
 - `潤滑油`（`lubricant`）：`0.4%`
+- `火力全開`（`full_firepower`）：`0.4%`
 - `閃電鏈`（`chain_lightning`）：`0.2%`
 - `勇氣旗幟`（`courage_banner`）：`0.2%`
 - `殺戮旗幟`（`slaughter_banner`）：`0.2%`
@@ -26,6 +27,7 @@
 ### 3.2 fire
 - `力量之書`（`power_book`）：`2%`
 - `潤滑油`（`lubricant`）：`0.4%`
+- `火力全開`（`full_firepower`）：`0.4%`
 - `閃電鏈`（`chain_lightning`）：`0.2%`
 - `勇氣旗幟`（`courage_banner`）：`0.2%`
 - `殺戮旗幟`（`slaughter_banner`）：`0.2%`
@@ -34,6 +36,7 @@
 ### 3.3 water
 - `等級之書`（`level_book`）：`1%`
 - `潤滑油`（`lubricant`）：`0.4%`
+- `火力全開`（`full_firepower`）：`0.4%`
 - `閃電鏈`（`chain_lightning`）：`0.2%`
 - `勇氣旗幟`（`courage_banner`）：`0.2%`
 - `殺戮旗幟`（`slaughter_banner`）：`0.2%`
@@ -42,10 +45,18 @@
 ### 3.4 wood
 - `速度之書`（`speed_book`）：`1%`
 - `潤滑油`（`lubricant`）：`0.4%`
+- `火力全開`（`full_firepower`）：`0.4%`
 - `閃電鏈`（`chain_lightning`）：`0.2%`
 - `勇氣旗幟`（`courage_banner`）：`0.2%`
 - `殺戮旗幟`（`slaughter_banner`）：`0.2%`
 - `靈活旗幟`（`agility_banner`）：`0.2%`
+
+## 3.5 輔助塔相關額外產出
+- 以下由「輔助塔升級/專精」直接產生，不走怪物掉落表：
+  - `level_book`
+  - `speed_book`
+  - `power_book`
+  - `crit_book`
 
 ## 4. 維護建議
 - 若要調整掉落機率，請同步修改：

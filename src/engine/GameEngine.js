@@ -33,6 +33,7 @@ export class GameEngine {
 
         this.paused = false;
         this.lastTime = 0;
+        this.userGameSpeed = 1;
         this.globalMasteries = {
             speedAura: false,
             fireMastery: false,
@@ -50,6 +51,40 @@ export class GameEngine {
         const def = Object.values(TALENTS).find(t => t.id === id);
         if (!def) return 0;
         return level * def.perLevel;
+    }
+
+    getTowerTalentProfile(typeId) {
+        if (typeId === 'melee') {
+            return {
+                baseDmgId: 'melee_tower_dmg_base',
+                attrDmgId: 'melee_tower_attr_dmg',
+                atkSpeedId: 'melee_tower_atk_speed',
+                critChanceId: 'melee_tower_crit_chance',
+                rangeId: 'melee_tower_range'
+            };
+        }
+
+        if (typeId === 'magic') {
+            return {
+                baseDmgId: 'spell_tower_dmg_base',
+                attrDmgId: null,
+                atkSpeedId: 'spell_tower_atk_speed',
+                critChanceId: null,
+                rangeId: 'spell_tower_range'
+            };
+        }
+
+        if (typeId === 'projectile' || typeId === 'projectile_slow' || typeId === 'projectile_aoe') {
+            return {
+                baseDmgId: 'range_tower_dmg_base',
+                attrDmgId: 'range_tower_attr_dmg',
+                atkSpeedId: 'range_tower_atk_speed',
+                critChanceId: 'range_tower_crit_chance',
+                rangeId: 'range_tower_range'
+            };
+        }
+
+        return null;
     }
 
     getTowerStats(typeId) {
@@ -71,13 +106,19 @@ export class GameEngine {
             };
         }
 
+        const profile = this.getTowerTalentProfile(typeId);
+        const rangeBonus = profile?.rangeId ? this.getTalentValue(profile.rangeId) : 0;
+        const speedBonus = profile?.atkSpeedId ? this.getTalentValue(profile.atkSpeedId) : 0;
+        const critBonus = profile?.critChanceId ? this.getTalentValue(profile.critChanceId) : 0;
+        const baseBonus = profile?.baseDmgId ? this.getTalentValue(profile.baseDmgId) : 0;
+        const attrBonus = profile?.attrDmgId ? this.getTalentValue(profile.attrDmgId) : 0;
         const levelMults = {
-            range: statsBase.range + this.getTalentValue('tower_range'),
-            speed: statsBase.speed * (1 + this.getTalentValue('tower_atk_speed')),
-            crit: statsBase.crit + this.getTalentValue('tower_crit_chance'),
+            range: statsBase.range + rangeBonus,
+            speed: statsBase.speed * (1 + speedBonus),
+            crit: statsBase.crit + critBonus,
         };
 
-        const baseDmgCalc = (statsBase.damage + this.getTalentValue('tower_dmg_base')) * (1 + this.getTalentValue('tower_attr_dmg'));
+        const baseDmgCalc = (statsBase.damage + baseBonus) * (1 + attrBonus);
 
         return {
             ...statsBase,
@@ -194,7 +235,8 @@ export class GameEngine {
             this.spawnTimer -= dt;
             if (this.spawnTimer <= 0) {
                 console.log("Spawning Mob...", this.mobsSpawned + 1, "/", waveCount);
-                this.spawnMob(config.type);
+                const isBoss = this.mobsSpawned === waveCount - 1;
+                this.spawnMob(config.type, { isBoss });
                 this.mobsSpawned++;
                 this.spawnTimer = spawnInterval;
             }
@@ -220,19 +262,23 @@ export class GameEngine {
         }
     }
 
-    spawnMob(typeId) {
+    spawnMob(typeId, options = {}) {
         if (!this.path || this.path.length === 0) {
             console.error("Path missing! Cannot spawn mob.");
             return;
         }
         const buff = this.getMobHpMultiplier();
+        const isBoss = !!options.isBoss;
+        const bossHpMultiplier = isBoss ? 6 : 1;
+        const bossSpeedMultiplier = isBoss ? 0.9 : 1;
 
         const newMob = {
             id: Math.random(),
             type: typeId,
-            hp: 10 * this.wave * buff * this.getWaveHpScale(this.wave),
-            maxHp: 10 * this.wave * buff * this.getWaveHpScale(this.wave),
-            speed: 2,
+            isBoss,
+            hp: 10 * this.wave * buff * this.getWaveHpScale(this.wave) * bossHpMultiplier,
+            maxHp: 10 * this.wave * buff * this.getWaveHpScale(this.wave) * bossHpMultiplier,
+            speed: 2 * bossSpeedMultiplier,
             slowTimer: 0,
             slowMultiplier: 1,
             stunTimer: 0,
@@ -242,7 +288,7 @@ export class GameEngine {
             y: this.path[0].y,
         };
 
-        console.log("Mob Spawned:", newMob.type, "at", newMob.x, newMob.y);
+        console.log("Mob Spawned:", isBoss ? "boss" : "mob", newMob.type, "at", newMob.x, newMob.y);
         this.mobs.push(newMob);
     }
 
@@ -345,7 +391,7 @@ export class GameEngine {
             return 1;
         }
         const baseCount = 1;
-        const bonusCount = Math.max(0, Math.floor(this.getTalentValue('tower_proj_count'))) + (tower?.bonusTargets || 0);
+        const bonusCount = Math.max(0, Math.floor(this.getTalentValue('range_tower_proj_count'))) + (tower?.bonusTargets || 0);
         return baseCount + bonusCount;
     }
 
@@ -353,7 +399,7 @@ export class GameEngine {
         if (tower?.stats?.type === 'magic') {
             return 0;
         }
-        return Math.max(0, Math.floor(this.getTalentValue('tower_chain'))) + (tower?.bonusChain || 0);
+        return Math.max(0, Math.floor(this.getTalentValue('range_tower_chain'))) + (tower?.bonusChain || 0);
     }
 
     findTargets(tower, maxTargets = 1) {
@@ -617,6 +663,12 @@ export class GameEngine {
 
         this.gold += 10;
 
+        if (mob?.isBoss) {
+            for (const t of this.towers) {
+                this.grantTowerExp(t, 2);
+            }
+        }
+
         if (!tower) return;
 
         this.grantSupportExpFromNearbyKill(tower);
@@ -635,9 +687,11 @@ export class GameEngine {
         if (!mob || !this.events?.onItemDrop) return;
         const table = MONSTER_ITEM_DROP_TABLE[mob.type] || [];
         if (table.length === 0) return;
+        const itemDropMult = 1 + this.getTalentValue('item_drop_rate');
 
         for (const entry of table) {
-            if (Math.random() < entry.chance) {
+            const finalChance = Math.min(1, entry.chance * itemDropMult);
+            if (Math.random() < finalChance) {
                 this.events.onItemDrop(entry.itemId, 1, mob.type);
             }
         }
@@ -942,8 +996,18 @@ export class GameEngine {
     }
 
     getGameSpeedMultiplier() {
-        const level = Math.min(4, this.talents.game_speed || 0);
-        return 1 + (level * 0.25);
+        return this.userGameSpeed;
+    }
+
+    getMaxGameSpeedMultiplier() {
+        return 2;
+    }
+
+    setGameSpeedMultiplier(nextSpeed) {
+        const cap = this.getMaxGameSpeedMultiplier();
+        const clamped = Math.max(1, Math.min(cap, Number(nextSpeed) || 1));
+        this.userGameSpeed = Math.round(clamped * 100) / 100;
+        return this.userGameSpeed;
     }
 
     getWaveConfig(wave) {
@@ -1168,11 +1232,24 @@ export class GameEngine {
     }
 
     grantTowerKill(tower) {
-        if (!tower) return;
-        if (this.isSupportTower(tower)) return;
-        tower.kills++;
-        if (tower.kills >= 10 && tower.level < 15) {
-            tower.kills = 0;
+        this.grantTowerExp(tower, 1);
+    }
+
+    grantTowerExp(tower, amount = 1) {
+        if (!tower || amount <= 0) return;
+
+        if (this.isSupportTower(tower)) {
+            tower.supportExp = (tower.supportExp || 0) + amount;
+            while ((tower.supportExp || 0) >= 15 && tower.level < 15) {
+                tower.supportExp -= 15;
+                this.levelUpTower(tower, 1);
+            }
+            return;
+        }
+
+        tower.kills = (tower.kills || 0) + amount;
+        while (tower.kills >= 10 && tower.level < 15) {
+            tower.kills -= 10;
             this.levelUpTower(tower, 1);
         }
     }
@@ -1244,15 +1321,17 @@ export class GameEngine {
             if (itemId === 'lubricant') {
                 const towerDef = Object.values(TOWER_TYPES).find((t) => t.id === tower.type) || TOWER_TYPES.MELEE;
                 const typeBaseSpeed = towerDef?.stats?.speed || 1;
-                const talentSpeedMult = 1 + this.getTalentValue('tower_atk_speed');
+                const talentProfile = this.getTowerTalentProfile(tower.type);
+                const talentSpeedMult = 1 + (talentProfile?.atkSpeedId ? this.getTalentValue(talentProfile.atkSpeedId) : 0);
                 const previousBaseWithTalent = Math.max(0.0001, typeBaseSpeed * talentSpeedMult);
                 const existingBonusMult = Math.max(0, (tower.stats.speed || 0) / previousBaseWithTalent);
                 tower.stats.speed = talentSpeedMult * existingBonusMult;
             } else if (itemId === 'full_firepower') {
                 const towerDef = Object.values(TOWER_TYPES).find((t) => t.id === tower.type) || TOWER_TYPES.MELEE;
                 const typeBaseDamage = towerDef?.stats?.damage || 1;
-                const talentBaseBonus = this.getTalentValue('tower_dmg_base');
-                const talentAttrMult = 1 + this.getTalentValue('tower_attr_dmg');
+                const talentProfile = this.getTowerTalentProfile(tower.type);
+                const talentBaseBonus = talentProfile?.baseDmgId ? this.getTalentValue(talentProfile.baseDmgId) : 0;
+                const talentAttrMult = 1 + (talentProfile?.attrDmgId ? this.getTalentValue(talentProfile.attrDmgId) : 0);
                 const previousBaseWithTalent = Math.max(0.0001, (typeBaseDamage + talentBaseBonus) * talentAttrMult);
                 const existingBonusMult = Math.max(0, (tower.stats.damage || 0) / previousBaseWithTalent);
                 tower.stats.damage = Math.max(0, (40 + talentBaseBonus) * talentAttrMult * existingBonusMult);

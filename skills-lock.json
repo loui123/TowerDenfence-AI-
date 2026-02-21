@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "Pixel Art Animator": {
+      "source": "willibrandon/pixel-plugin",
+      "sourceType": "github",
+      "computedHash": "4823747009715bf66bed4befbd6ff6645bbcde588c25f958febf7a7fc073f9e6"
+    },
+    "Pixel Art Exporter": {
+      "source": "willibrandon/pixel-plugin",
+      "sourceType": "github",
+      "computedHash": "c198e25e601866cc4c43bea0e8cca61e09e05b9dc7e31c35a59095dbc32dea0a"
+    },
+    "Pixel Art Professional": {
+      "source": "willibrandon/pixel-plugin",
+      "sourceType": "github",
+      "computedHash": "35f44f01cf688f7f5a6223aa2c6cdd1dfb4278668cb7037db32a350f3951c2e9"
+    }
+  }
+}

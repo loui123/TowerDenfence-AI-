@@ -193,6 +193,12 @@ const UPGRADE_OPTION_MAP = Object.fromEntries(ALL_UPGRADE_POOL.map((x) => [x.id,
 const UPGRADE_LABEL_MAP = Object.fromEntries(ALL_UPGRADE_POOL.map((x) => [x.id, x.label]));
 const SPECIALIZATION_LABEL_MAP = Object.fromEntries(ALL_SPECIALIZATION_POOL.map((x) => [x.id, x.label]));
 const BGM_PATTERN = [52, 55, 59, 55, 60, 59, 55, 52, 50, 52, 55, 57, 55, 52, 50, 48];
+const UPDATE_LOG_ITEMS = [
+    '新增輔助塔：可提供攻擊/速度/緩速/暴擊/幸運靈氣。',
+    '左側塔資訊面板改為可點選同步（非 hover）。',
+    '怪物資訊面板改為左右雙欄（當波/下波）。',
+    '新增道具與裝備效果顯示與平衡調整。'
+];
 
 const Game = ({ onExit }) => {
     const { talents, resources, addResource } = useGame();
@@ -222,6 +228,7 @@ const Game = ({ onExit }) => {
         mobsCount: 0,
         waveActive: false,
         gameSpeed: 1,
+        gameSpeedCap: 2,
         pendingUpgradePoints: 0
     });
 
@@ -232,14 +239,15 @@ const Game = ({ onExit }) => {
     const [upgradeTarget, setUpgradeTarget] = useState(null); // {x, y}
     const [upgradeOptions, setUpgradeOptions] = useState([]);
     const [towerPanelMode, setTowerPanelMode] = useState('upgrade'); // upgrade | specialization
-    const [hoverTowerPos, setHoverTowerPos] = useState(null); // {x, y}
+    const [selectedTowerId, setSelectedTowerId] = useState(null);
     const [viewport, setViewport] = useState({
         width: typeof window !== 'undefined' ? window.innerWidth : 1280,
         height: typeof window !== 'undefined' ? window.innerHeight : 720
     });
     const [inventory, setInventory] = useState([]); // [{id, count}]
     const [selectedItemId, setSelectedItemId] = useState(null);
-    const [dropLog, setDropLog] = useState([]);
+    const [, setDropLog] = useState([]);
+    const [consoleLog, setConsoleLog] = useState([]);
     const [inventoryTab, setInventoryTab] = useState(ITEM_TYPES.CONSUMABLE);
     const [inventoryPageByType, setInventoryPageByType] = useState({
         [ITEM_TYPES.CONSUMABLE]: 0,
@@ -502,6 +510,7 @@ const Game = ({ onExit }) => {
             },
             onWaveComplete: (wave) => {
                 triggerSfx('wave');
+                appendConsoleLog(`第 ${wave - 1} 波完成`);
                 if (autoNextWaveRef.current) {
                     setTimeout(() => {
                         if (engineRef.current) engineRef.current.startNextWave();
@@ -510,6 +519,7 @@ const Game = ({ onExit }) => {
             },
             onResourceDrop: (type, amount) => {
                 addResource(type, amount);
+                appendConsoleLog(`資源掉落: ${type} +${amount}`);
             },
             onItemDrop: (itemId, count = 1, fromMobType = 'unknown') => {
                 const def = ITEM_DEFS[itemId];
@@ -528,6 +538,7 @@ const Game = ({ onExit }) => {
                     `${def.name} +${count}（來源: ${fromMobType}）`,
                     ...prev
                 ].slice(0, 5));
+                appendConsoleLog(`道具掉落: ${def.name} +${count}（來源: ${fromMobType}）`);
             },
             onTowerUpgradeAvailable: () => {
                 // Pending points are rendered via requestDraw.
@@ -548,6 +559,7 @@ const Game = ({ onExit }) => {
                     mobsCount: engine.mobs.length,
                     waveActive: engine.waveActive,
                     gameSpeed: engine.getGameSpeedMultiplier(),
+                    gameSpeedCap: engine.getMaxGameSpeedMultiplier(),
                     pendingUpgradePoints
                 });
             }
@@ -593,8 +605,8 @@ const Game = ({ onExit }) => {
                 if (mob.type === 'water') img = images.water;
                 if (mob.type === 'wood') img = images.wood;
 
-                const w = 30;
-                const h = 30;
+                const w = mob.isBoss ? 40 : 30;
+                const h = mob.isBoss ? 40 : 30;
                 const screenX = mob.x * CELL_SIZE + CELL_SIZE / 2 - w / 2;
                 const screenY = mob.y * CELL_SIZE + CELL_SIZE / 2 - h / 2;
 
@@ -622,6 +634,15 @@ const Game = ({ onExit }) => {
 
                 ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
                 ctx.fillRect(barX, barY, barW * hpPct, barH);
+
+                if (mob.isBoss) {
+                    ctx.strokeStyle = '#ffd166';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(screenX, screenY, w, h);
+                    ctx.fillStyle = '#ffd166';
+                    ctx.font = 'bold 11px sans-serif';
+                    ctx.fillText('B', screenX + w - 10, screenY + 12);
+                }
             });
 
             eng.projectiles.forEach((proj) => {
@@ -738,10 +759,16 @@ const Game = ({ onExit }) => {
         return engineRef.current.getTowerAt(upgradeTarget.x, upgradeTarget.y);
     }, [upgradeTarget, gameState.pendingUpgradePoints]);
 
-    const hoveredTower = useMemo(() => {
-        if (!hoverTowerPos || !engineRef.current) return null;
-        return engineRef.current.getTowerAt(hoverTowerPos.x, hoverTowerPos.y);
-    }, [hoverTowerPos, gameState.pendingUpgradePoints, gameState.mobsCount]);
+    const selectedTower = useMemo(() => {
+        if (!selectedTowerId || !engineRef.current) return null;
+        return engineRef.current.towers.find((tower) => tower.id === selectedTowerId) || null;
+    }, [selectedTowerId, gameState.pendingUpgradePoints, gameState.mobsCount]);
+
+    useEffect(() => {
+        if (selectedTowerId && !selectedTower) {
+            setSelectedTowerId(null);
+        }
+    }, [selectedTowerId, selectedTower]);
 
     const upgradeAuraSnapshot = useMemo(() => {
         if (!upgradeTower || !engineRef.current) return null;
@@ -918,6 +945,23 @@ const Game = ({ onExit }) => {
         engineRef.current.startNextWave();
     };
 
+    const changeGameSpeed = (direction) => {
+        if (!engineRef.current) return;
+        const step = 0.25;
+        const nextSpeed = engineRef.current.getGameSpeedMultiplier() + (direction * step);
+        const appliedSpeed = engineRef.current.setGameSpeedMultiplier(nextSpeed);
+        setGameState((prev) => ({
+            ...prev,
+            gameSpeed: appliedSpeed,
+            gameSpeedCap: engineRef.current.getMaxGameSpeedMultiplier()
+        }));
+    };
+
+    const appendConsoleLog = (line) => {
+        const stamp = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+        setConsoleLog((prev) => [...prev, `[${stamp}] ${line}`].slice(-7));
+    };
+
     const shiftInventoryPage = (type, delta) => {
         setInventoryPageByType((prev) => {
             const total = Math.max(1, Math.ceil((inventoryByType[type]?.length || 0) / inventorySlotsPerPage));
@@ -942,6 +986,7 @@ const Game = ({ onExit }) => {
 
         if (cell.type === 'tower') {
             const tower = engineRef.current.getTowerAt(x, y);
+            if (tower) setSelectedTowerId(tower.id);
 
             if (tower && selectedInventoryItem) {
                 const result = engineRef.current.applyInventoryItem(tower, selectedInventoryItem.id);
@@ -1051,11 +1096,11 @@ const Game = ({ onExit }) => {
     };
 
     const engine = engineRef.current;
-    const hoveredTowerDetail = useMemo(() => {
-        if (!hoveredTower) return null;
-        const typeDef = Object.values(TOWER_TYPES).find((t) => t.id === hoveredTower.type);
+    const selectedTowerDetail = (() => {
+        if (!selectedTower) return null;
+        const typeDef = Object.values(TOWER_TYPES).find((t) => t.id === selectedTower.type);
         const baseStats = typeDef?.stats || {};
-        const auraSnapshot = engine?.getTowerAuraSnapshot?.(hoveredTower) || {
+        const auraSnapshot = engine?.getTowerAuraSnapshot?.(selectedTower) || {
             damagePct: 0,
             speedPct: 0,
             critChancePct: 0,
@@ -1063,37 +1108,37 @@ const Game = ({ onExit }) => {
             bannerCritDmgBonus: 0,
             luckCritDmgBonus: 0
         };
-        const supportAuraStatus = isSupportTower(hoveredTower)
-            ? (engine?.getSupportAuraStatus?.(hoveredTower) || null)
+        const supportAuraStatus = isSupportTower(selectedTower)
+            ? (engine?.getSupportAuraStatus?.(selectedTower) || null)
             : null;
 
         const initialDamage = baseStats.damage || 0;
-        const currentBaseDamage = hoveredTower.stats?.damage || 0;
+        const currentBaseDamage = selectedTower.stats?.damage || 0;
         const bonusBaseDamage = Math.max(0, currentBaseDamage - initialDamage);
 
-        const extraFire = hoveredTower.stats?.extraFire || 0;
-        const extraWater = hoveredTower.stats?.extraWater || 0;
-        const extraWood = hoveredTower.stats?.extraWood || 0;
+        const extraFire = selectedTower.stats?.extraFire || 0;
+        const extraWater = selectedTower.stats?.extraWater || 0;
+        const extraWood = selectedTower.stats?.extraWood || 0;
 
         const initialCrit = (baseStats.crit || 0) * 100;
-        const currentCrit = (hoveredTower.stats?.crit || 0) * 100;
+        const currentCrit = (selectedTower.stats?.crit || 0) * 100;
         const extraCrit = currentCrit - initialCrit;
 
-        const currentCritDmg = hoveredTower.stats?.critDmg || INITIAL_CRIT_DMG;
+        const currentCritDmg = selectedTower.stats?.critDmg || INITIAL_CRIT_DMG;
         const extraCritDmg = currentCritDmg - INITIAL_CRIT_DMG;
 
         const initialSpeed = baseStats.speed || 0;
-        const currentSpeed = hoveredTower.stats?.speed || 0;
+        const currentSpeed = selectedTower.stats?.speed || 0;
         const extraSpeed = currentSpeed - initialSpeed;
 
         const initialRange = baseStats.range || 0;
-        const currentRange = hoveredTower.stats?.range || 0;
+        const currentRange = selectedTower.stats?.range || 0;
         const extraRange = currentRange - initialRange;
 
-        const specRows = hoveredTower.specializationId
-            ? [{ key: hoveredTower.specializationId, label: SPECIALIZATION_LABEL_MAP[hoveredTower.specializationId] || hoveredTower.specializationId, isSpec: true }]
+        const specRows = selectedTower.specializationId
+            ? [{ key: selectedTower.specializationId, label: SPECIALIZATION_LABEL_MAP[selectedTower.specializationId] || selectedTower.specializationId, isSpec: true }]
             : [];
-        const upgradeRows = Object.entries(hoveredTower.upgradeStats || {})
+        const upgradeRows = Object.entries(selectedTower.upgradeStats || {})
             .filter(([, lv]) => lv > 0)
             .map(([id, lv]) => ({
                 key: id,
@@ -1116,12 +1161,12 @@ const Game = ({ onExit }) => {
             extraSpeed,
             initialRange,
             extraRange,
-            equipmentName: hoveredTower.equipmentName || null,
+            equipmentName: selectedTower.equipmentName || null,
             talentRows: [...specRows, ...upgradeRows],
             auraSnapshot,
             supportAuraStatus
         };
-    }, [engine, hoveredTower]);
+    })();
 
     const towerRows = engine
         ? [...engine.towers].map((tower) => {
@@ -1157,6 +1202,7 @@ const Game = ({ onExit }) => {
             return {
                 type: cfg.type,
                 spawnTarget: Math.max(1, Math.floor(cfg.count * density)),
+                bossCount: 1,
                 spawned: engine.mobsSpawned || 0,
                 alive: engine.mobs.length || 0,
                 hpScale: engine.getWaveHpScale(gameState.wave),
@@ -1177,6 +1223,7 @@ const Game = ({ onExit }) => {
                 wave: nextWave,
                 type: cfg.type,
                 spawnTarget: Math.max(1, Math.floor(cfg.count * density)),
+                bossCount: 1,
                 hpScale: engine.getWaveHpScale(nextWave),
                 hp: Math.floor(hp),
                 speed: 2.0,
@@ -1205,7 +1252,8 @@ const Game = ({ onExit }) => {
         ? Math.min(1, (viewport.width - 16) / baseMapSize, mobileMiddleHeight / baseMapSize)
         : 1;
     const scaledMapSize = baseMapSize * mapScale;
-    const topBarOffset = isMobile ? mobileTopBarOffset : 70;
+    const topBarOffset = isMobile ? mobileTopBarOffset : Math.max(70, topBarHeight);
+    const desktopContentHeight = `calc(100vh - ${topBarOffset + 12}px)`;
     const inventoryCols = 4;
     const inventoryRows = 3;
     const inventorySlotsPerPage = inventoryCols * inventoryRows;
@@ -1232,7 +1280,11 @@ const Game = ({ onExit }) => {
     };
 
     return (
-        <div className="game-screen" style={{ position: 'relative', width: '100vw', height: isMobile ? `${Math.floor(viewport.height)}px` : '100vh', background: '#111', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', userSelect: 'none', WebkitUserSelect: 'none', overflow: 'hidden' }}>
+        <div
+            className="game-screen"
+            onWheel={(e) => e.preventDefault()}
+            style={{ position: 'relative', width: '100vw', height: isMobile ? `${Math.floor(viewport.height)}px` : '100vh', background: '#111', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', userSelect: 'none', WebkitUserSelect: 'none', overflow: 'hidden' }}
+        >
             <style>{`
                 @keyframes tower-ready-blink {
                     0% { box-shadow: 0 0 0 1px rgba(94,255,122,0.35) inset; }
@@ -1262,7 +1314,26 @@ const Game = ({ onExit }) => {
                     <span style={{ color: 'red', display: 'flex', alignItems: 'center', gap: '5px' }}><Heart size={16} /> {gameState.hp}/{gameState.maxHp}</span>
                     <span style={{ color: '#aaa' }}>波數: {gameState.wave}</span>
                     <span>怪物: {gameState.mobsCount}</span>
-                    <span style={{ color: '#8ec5ff' }}>速度 x{gameState.gameSpeed.toFixed(2)}</span>
+                    <span style={{ color: '#8ec5ff', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        速度 x{gameState.gameSpeed.toFixed(2)}
+                        <button
+                            onClick={() => changeGameSpeed(-1)}
+                            disabled={gameState.gameSpeed <= 1}
+                            style={{ padding: '1px 6px', lineHeight: 1, opacity: gameState.gameSpeed <= 1 ? 0.45 : 1 }}
+                            title="降低遊戲速度"
+                        >
+                            -
+                        </button>
+                        <button
+                            onClick={() => changeGameSpeed(1)}
+                            disabled={gameState.gameSpeed >= gameState.gameSpeedCap}
+                            style={{ padding: '1px 6px', lineHeight: 1, opacity: gameState.gameSpeed >= gameState.gameSpeedCap ? 0.45 : 1 }}
+                            title={gameState.gameSpeedCap > 2 ? '提高遊戲速度' : '需先在主選單升級遊戲速度天賦'}
+                        >
+                            +
+                        </button>
+                        <span style={{ color: '#7aa8d8', fontSize: '0.85em' }}>上限 x{gameState.gameSpeedCap.toFixed(2)}</span>
+                    </span>
                     <span style={{ color: '#9ee493' }}>能量: {resources.energy}</span>
                     <span style={{ color: '#86c5ff' }}>木材: {resources.wood}</span>
                     <span style={{ color: '#ffb36a' }}>礦石: {resources.ore}</span>
@@ -1322,9 +1393,10 @@ const Game = ({ onExit }) => {
                 marginTop: `${topBarOffset}px`,
                 width: isMobile ? '100%' : 'calc(100vw - 40px)',
                 maxWidth: isMobile ? '100%' : '1780px',
-                height: isMobile ? `${mobileMiddleHeight}px` : 'calc(100vh - 90px)',
-                padding: isMobile ? '0 8px' : 0,
-                overflow: isMobile ? 'hidden' : 'auto'
+                height: isMobile ? `${mobileMiddleHeight}px` : desktopContentHeight,
+                padding: isMobile ? '0 8px' : '0 0 12px',
+                boxSizing: 'border-box',
+                overflow: 'hidden'
             }}>
                 <div style={{
                     width: isMobile ? '100%' : '30%',
@@ -1336,80 +1408,41 @@ const Game = ({ onExit }) => {
                     order: isMobile ? 3 : 1
                 }}>
                     <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', overflow: 'hidden' }}>
-                        <div style={{ fontSize: '1.1rem', marginBottom: '10px' }}>滑鼠 hover 塔的詳細資訊</div>
-                        {hoveredTower && hoveredTowerDetail ? (
-                            <div style={{ lineHeight: 1.45, color: '#ddd', display: 'flex', flexDirection: 'column', gap: '10px', height: 'calc(100% - 30px)' }}>
-                                <div>
-                                <div>名稱: {getTowerName(hoveredTower.type)}</div>
-                                <div>等級: {hoveredTower.level}</div>
-                                {hoveredTowerDetail.equipmentName && <div>裝備: {hoveredTowerDetail.equipmentName}</div>}
-                                <div>
-                                    傷害:
-                                    {' '}
-                                    {Math.floor(hoveredTowerDetail.initialDamage)}
-                                    {' + '}
-                                    {Math.floor(hoveredTowerDetail.bonusBaseDamage)}
-                                    {' + '}
-                                    <span style={{ color: '#ff7373' }}>火 {Math.floor(hoveredTowerDetail.extraFire)}</span>
-                                    {' / '}
-                                    <span style={{ color: '#7fb7ff' }}>水 {Math.floor(hoveredTowerDetail.extraWater)}</span>
-                                    {' / '}
-                                    <span style={{ color: '#8ddc8d' }}>木 {Math.floor(hoveredTowerDetail.extraWood)}</span>
-                                </div>
-                                <div>
-                                    暴擊率: {hoveredTowerDetail.initialCrit.toFixed(0)}%
-                                    {' + '}
-                                    ({hoveredTowerDetail.extraCrit >= 0 ? '+' : ''}{hoveredTowerDetail.extraCrit.toFixed(0)}%)
-                                </div>
-                                <div>
-                                    暴擊傷害: {INITIAL_CRIT_DMG.toFixed(2)}
-                                    {' + '}
-                                    ({hoveredTowerDetail.extraCritDmg >= 0 ? '+' : ''}{hoveredTowerDetail.extraCritDmg.toFixed(2)})
-                                </div>
-                                <div>
-                                    攻速: {hoveredTowerDetail.initialSpeed.toFixed(2)}
-                                    {' + '}
-                                    ({hoveredTowerDetail.extraSpeed >= 0 ? '+' : ''}{hoveredTowerDetail.extraSpeed.toFixed(2)})
-                                </div>
-                                <div>
-                                    距離: {hoveredTowerDetail.initialRange.toFixed(1)}
-                                    {' + '}
-                                    ({hoveredTowerDetail.extraRange >= 0 ? '+' : ''}{hoveredTowerDetail.extraRange.toFixed(1)})
-                                </div>
-                                {!isSupportTower(hoveredTower) && (
-                                    <>
-                                        <div style={{ color: '#ffd99b' }}>
-                                            靈氣加成: 傷害 +{hoveredTowerDetail.auraSnapshot.damagePct.toFixed(0)}% | 攻速 +{hoveredTowerDetail.auraSnapshot.speedPct.toFixed(0)}%
-                                        </div>
-                                        <div style={{ color: '#ffd99b' }}>
-                                            靈氣加成: 暴擊率 +{hoveredTowerDetail.auraSnapshot.critChancePct.toFixed(0)}% | 暴傷 +{hoveredTowerDetail.auraSnapshot.critDmgBonus.toFixed(2)}
-                                        </div>
-                                    </>
-                                )}
-                                {isSupportTower(hoveredTower) && hoveredTowerDetail.supportAuraStatus && (
-                                    <>
-                                        <div style={{ color: '#8de8df' }}>
-                                            輔助靈氣: {hoveredTowerDetail.supportAuraStatus.auraType} | 效果 +{hoveredTowerDetail.supportAuraStatus.effectPct.toFixed(0)}%
-                                        </div>
-                                        <div style={{ color: '#8de8df' }}>
-                                            範圍: {hoveredTowerDetail.supportAuraStatus.range.toFixed(1)} | 影響塔: {hoveredTowerDetail.supportAuraStatus.affectedTowerCount}
-                                            {hoveredTowerDetail.supportAuraStatus.auraType === 'slow' ? ` | 影響怪: ${hoveredTowerDetail.supportAuraStatus.affectedMobCount}` : ''}
-                                        </div>
-                                        {hoveredTower.supportLuckyAura && (
+                        <div style={{ fontSize: '1.1rem', marginBottom: '10px' }}>塔的詳細資訊</div>
+                        {selectedTower && selectedTowerDetail ? (
+                            <div style={{ lineHeight: 1.42, color: '#ddd', height: 'calc(100% - 32px)', display: 'grid', gridTemplateColumns: '1.2fr 0.95fr', gap: '10px', minHeight: 0 }}>
+                                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                                    <div>名稱: {getTowerName(selectedTower.type)}</div>
+                                    <div>等級: {selectedTower.level}</div>
+                                    {selectedTowerDetail.equipmentName && <div>裝備: {selectedTowerDetail.equipmentName}</div>}
+                                    <div>傷害: {Math.floor(selectedTowerDetail.initialDamage)} + {Math.floor(selectedTowerDetail.bonusBaseDamage)} + <span style={{ color: '#ff7373' }}>火 {Math.floor(selectedTowerDetail.extraFire)}</span> / <span style={{ color: '#7fb7ff' }}>水 {Math.floor(selectedTowerDetail.extraWater)}</span> / <span style={{ color: '#8ddc8d' }}>木 {Math.floor(selectedTowerDetail.extraWood)}</span></div>
+                                    <div>暴擊率: {selectedTowerDetail.initialCrit.toFixed(0)}% + ({selectedTowerDetail.extraCrit >= 0 ? '+' : ''}{selectedTowerDetail.extraCrit.toFixed(0)}%)</div>
+                                    <div>暴擊傷害: {INITIAL_CRIT_DMG.toFixed(2)} + ({selectedTowerDetail.extraCritDmg >= 0 ? '+' : ''}{selectedTowerDetail.extraCritDmg.toFixed(2)})</div>
+                                    <div>攻速: {selectedTowerDetail.initialSpeed.toFixed(2)} + ({selectedTowerDetail.extraSpeed >= 0 ? '+' : ''}{selectedTowerDetail.extraSpeed.toFixed(2)})</div>
+                                    <div>距離: {selectedTowerDetail.initialRange.toFixed(1)} + ({selectedTowerDetail.extraRange >= 0 ? '+' : ''}{selectedTowerDetail.extraRange.toFixed(1)})</div>
+                                    {!isSupportTower(selectedTower) && (
+                                        <>
+                                            <div style={{ color: '#ffd99b' }}>靈氣加成: 傷害 +{selectedTowerDetail.auraSnapshot.damagePct.toFixed(0)}% | 攻速 +{selectedTowerDetail.auraSnapshot.speedPct.toFixed(0)}%</div>
+                                            <div style={{ color: '#ffd99b' }}>靈氣加成: 暴擊率 +{selectedTowerDetail.auraSnapshot.critChancePct.toFixed(0)}% | 暴傷 +{selectedTowerDetail.auraSnapshot.critDmgBonus.toFixed(2)}</div>
+                                        </>
+                                    )}
+                                    {isSupportTower(selectedTower) && selectedTowerDetail.supportAuraStatus && (
+                                        <>
+                                            <div style={{ color: '#8de8df' }}>輔助靈氣: {selectedTowerDetail.supportAuraStatus.auraType} | 效果 +{selectedTowerDetail.supportAuraStatus.effectPct.toFixed(0)}%</div>
                                             <div style={{ color: '#8de8df' }}>
-                                                幸運靈氣: +{hoveredTowerDetail.supportAuraStatus.luckyCritDmgBonus.toFixed(2)} 暴傷
+                                                範圍: {selectedTowerDetail.supportAuraStatus.range.toFixed(1)} | 影響塔: {selectedTowerDetail.supportAuraStatus.affectedTowerCount}
+                                                {selectedTowerDetail.supportAuraStatus.auraType === 'slow' ? ` | 影響怪: ${selectedTowerDetail.supportAuraStatus.affectedMobCount}` : ''}
                                             </div>
-                                        )}
-                                    </>
-                                )}
+                                        </>
+                                    )}
                                 </div>
 
-                                <div style={{ borderTop: '1px solid #3a3a3a', paddingTop: '8px', overflow: 'auto' }}>
+                                <div style={{ borderLeft: '1px solid #2f2f2f', paddingLeft: '10px', overflow: 'hidden', minWidth: 0 }}>
                                     <div style={{ marginBottom: '4px', color: '#e5e5e5' }}>已選天賦</div>
-                                    {hoveredTowerDetail.talentRows.length === 0 ? (
+                                    {selectedTowerDetail.talentRows.length === 0 ? (
                                         <div style={{ color: '#8a8a8a' }}>尚未選擇天賦</div>
                                     ) : (
-                                        hoveredTowerDetail.talentRows.map((row) => (
+                                        selectedTowerDetail.talentRows.map((row) => (
                                             <div key={row.key} style={{ color: row.isSpec ? '#c0c0c0' : '#d7d7d7' }}>
                                                 {row.label} {row.isSpec ? '' : `LV${row.level}`}
                                             </div>
@@ -1418,17 +1451,30 @@ const Game = ({ onExit }) => {
                                 </div>
                             </div>
                         ) : (
-                            <div style={{ color: '#8a8a8a' }}>將滑鼠移到塔格上查看資訊</div>
+                            <div style={{ color: '#8a8a8a' }}>請點選地圖上的塔，或在下方列表點選一座塔</div>
                         )}
                     </div>
 
-                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', overflow: 'auto' }}>
-                        <div style={{ fontSize: '1.1rem', marginBottom: '10px' }}>目前擁有所有塔的等級及三選一資訊（專精優先）</div>
+                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', overflowY: 'auto', overflowX: 'hidden' }}>
+                        <div style={{ fontSize: '1.1rem', marginBottom: '10px' }}>所有塔資訊</div>
                         {towerRows.length === 0 ? (
                             <div style={{ color: '#8a8a8a' }}>目前還沒有塔</div>
                         ) : (
                             towerRows.map((row) => (
-                                <div key={row.id} style={{ borderBottom: '1px solid #2f2f2f', padding: '6px 0', fontSize: '0.9rem', lineHeight: 1.35 }}>
+                                <div
+                                    key={row.id}
+                                    onClick={() => setSelectedTowerId(row.id)}
+                                    style={{
+                                        border: selectedTowerId === row.id ? '1px solid #55c18f' : '1px solid #2f2f2f',
+                                        background: selectedTowerId === row.id ? 'rgba(85, 193, 143, 0.14)' : 'transparent',
+                                        borderRadius: '6px',
+                                        padding: '6px',
+                                        marginBottom: '6px',
+                                        fontSize: '0.9rem',
+                                        lineHeight: 1.35,
+                                        cursor: 'pointer'
+                                    }}
+                                >
                                     <div style={{ color: '#f0f0f0' }}>{row.name} Lv.{row.level}</div>
                                     {row.supportAuraType ? (
                                         <div style={{ color: '#bcbcbc' }}>
@@ -1482,17 +1528,12 @@ const Game = ({ onExit }) => {
                             const pendingSpecs = tower?.pendingSpecialization ? 1 : 0;
                             const pending = pendingUpgrades + pendingSpecs;
                             const isReady = pending > 0;
+                            const hasEquipment = !!tower?.equipmentId || !!tower?.equipmentName;
 
                             return (
                                 <div
                                     key={`${x}-${y}`}
                                     onMouseDown={(e) => e.preventDefault()}
-                                    onMouseEnter={() => {
-                                        if (cell.type === 'tower') setHoverTowerPos({ x, y });
-                                    }}
-                                    onMouseLeave={() => {
-                                        if (cell.type === 'tower') setHoverTowerPos(null);
-                                    }}
                                     onClick={() => handleCellClick(x, y)}
                                     style={{
                                         width: CELL_SIZE,
@@ -1534,7 +1575,7 @@ const Game = ({ onExit }) => {
                                         <div style={{
                                             position: 'absolute',
                                             top: 1,
-                                            right: 1,
+                                            right: hasEquipment ? 20 : 1,
                                             minWidth: 16,
                                             height: 16,
                                             borderRadius: 999,
@@ -1548,6 +1589,25 @@ const Game = ({ onExit }) => {
                                             padding: '0 4px'
                                         }}>
                                             {pending}
+                                        </div>
+                                    )}
+                                    {hasEquipment && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: 1,
+                                            right: 1,
+                                            width: 16,
+                                            height: 16,
+                                            borderRadius: 3,
+                                            background: '#4fa6ff',
+                                            color: '#eaf4ff',
+                                            fontSize: 11,
+                                            fontWeight: 800,
+                                            lineHeight: '16px',
+                                            textAlign: 'center',
+                                            boxShadow: '0 0 0 1px rgba(12, 35, 64, 0.7)'
+                                        }}>
+                                            E
                                         </div>
                                     )}
                                 </div>
@@ -1834,13 +1894,6 @@ const Game = ({ onExit }) => {
                                 <div style={{ color: '#8dd2ff' }}>選取後點擊地圖上的塔即可使用或裝備。</div>
                             </div>
                         )}
-                        {dropLog.length > 0 && (
-                            <div style={{ marginTop: '8px', borderTop: '1px solid #2f2f2f', paddingTop: '6px' }}>
-                                {dropLog.map((line, idx) => (
-                                    <div key={`drop-${idx}`} style={{ color: '#9bcf9f', fontSize: '0.8rem' }}>{line}</div>
-                                ))}
-                            </div>
-                        )}
                     </div>
                 </div>
                 </div>
@@ -1852,25 +1905,31 @@ const Game = ({ onExit }) => {
                     display: isMobile ? 'none' : 'grid',
                     gridTemplateRows: isMobile ? 'auto auto' : '40% 1fr',
                     gap: '8px',
-                    order: isMobile ? 2 : 3
+                    order: isMobile ? 2 : 3,
+                    minHeight: 0,
+                    overflow: 'hidden'
                 }}>
-                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', overflow: 'auto' }}>
+                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', overflow: 'hidden', minHeight: 0 }}>
                         <div style={{ fontSize: '1.1rem', marginBottom: '10px' }}>當波怪物資訊</div>
                         {waveInfo && (
-                            <div style={{ lineHeight: 1.45, color: '#ddd' }}>
-                                <div style={{ marginBottom: '8px' }}>
-                                    <img src={waveInfo.image} alt={waveInfo.type} style={{ width: 44, height: 44, objectFit: 'contain' }} />
+                            <div style={{ display: 'grid', gridTemplateColumns: nextWaveInfo ? '1fr 1fr' : '1fr', gap: '12px', lineHeight: 1.35, color: '#ddd', fontSize: '0.9rem' }}>
+                                <div style={{ minWidth: 0 }}>
+                                    <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>當波怪物資訊</div>
+                                    <div style={{ marginBottom: '6px' }}>
+                                        <img src={waveInfo.image} alt={waveInfo.type} style={{ width: 36, height: 36, objectFit: 'contain' }} />
+                                    </div>
+                                    <div>波數: {gameState.wave}</div>
+                                    <div>怪物類型: {waveInfo.type}</div>
+                                    <div>單位生命值: {waveInfo.hp}</div>
+                                    <div>基礎移動速度: {waveInfo.speed.toFixed(2)}</div>
+                                    <div>目標出怪數: {waveInfo.spawnTarget}</div>
+                                    <div>波尾 Boss: {waveInfo.bossCount}</div>
+                                    <div>已出怪數: {waveInfo.spawned}</div>
+                                    <div>場上存活: {waveInfo.alive}</div>
+                                    <div>關卡血量倍率: x{waveInfo.hpScale.toFixed(2)}</div>
                                 </div>
-                                <div>波數: {gameState.wave}</div>
-                                <div>怪物類型: {waveInfo.type}</div>
-                                <div>單位生命值: {waveInfo.hp}</div>
-                                <div>基礎移動速度: {waveInfo.speed.toFixed(2)}</div>
-                                <div>目標出怪數: {waveInfo.spawnTarget}</div>
-                                <div>已出怪數: {waveInfo.spawned}</div>
-                                <div>場上存活: {waveInfo.alive}</div>
-                                <div>關卡血量倍率: x{waveInfo.hpScale.toFixed(2)}</div>
                                 {nextWaveInfo && (
-                                    <div style={{ marginTop: '10px', borderTop: '1px solid #2f2f2f', paddingTop: '8px' }}>
+                                    <div style={{ minWidth: 0, borderLeft: '1px solid #2f2f2f', paddingLeft: '10px' }}>
                                         <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>下波怪物資訊</div>
                                         <div style={{ marginBottom: '6px' }}>
                                             <img src={nextWaveInfo.image} alt={nextWaveInfo.type} style={{ width: 36, height: 36, objectFit: 'contain' }} />
@@ -1880,6 +1939,7 @@ const Game = ({ onExit }) => {
                                         <div>單位生命值: {nextWaveInfo.hp}</div>
                                         <div>基礎移動速度: {nextWaveInfo.speed.toFixed(2)}</div>
                                         <div>目標出怪數: {nextWaveInfo.spawnTarget}</div>
+                                        <div>波尾 Boss: {nextWaveInfo.bossCount}</div>
                                         <div>關卡血量倍率: x{nextWaveInfo.hpScale.toFixed(2)}</div>
                                     </div>
                                 )}
@@ -1887,18 +1947,30 @@ const Game = ({ onExit }) => {
                         )}
                     </div>
 
-                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', overflow: 'auto' }}>
-                        <div style={{ fontSize: '1.1rem', marginBottom: '10px' }}>當波塔數據排名（傷害量、擊殺數）</div>
-                        {towerRankRows.length === 0 ? (
-                            <div style={{ color: '#8a8a8a' }}>目前沒有可排名的塔</div>
-                        ) : (
-                            towerRankRows.map((row, idx) => (
-                                <div key={row.id} style={{ borderBottom: '1px solid #2f2f2f', padding: '6px 0', fontSize: '0.9rem', lineHeight: 1.35 }}>
-                                    <div style={{ color: '#f0f0f0' }}>#{idx + 1} {row.name} Lv.{row.level}</div>
-                                    <div style={{ color: '#bcbcbc' }}>傷害: {row.damage} | 擊殺: {row.kills}</div>
-                                </div>
-                            ))
-                        )}
+                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', overflow: 'hidden', display: 'grid', gridTemplateRows: 'auto 1fr', gap: '10px', minHeight: 0, boxSizing: 'border-box' }}>
+                        <div style={{ fontSize: '1.1rem' }}>更新日誌 / Console</div>
+                        <div style={{ minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '10px' }}>
+                            <div style={{ border: '1px solid #3b3b3b', borderRadius: '6px', padding: '8px', overflow: 'hidden' }}>
+                                <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>更新日誌</div>
+                                {UPDATE_LOG_ITEMS.map((item, idx) => (
+                                    <div key={`update-${idx}`} style={{ color: '#cfd6df', fontSize: '0.84rem', lineHeight: 1.4, marginBottom: '4px' }}>
+                                        {idx + 1}. {item}
+                                    </div>
+                                ))}
+                            </div>
+                            <div style={{ border: '1px solid #3b3b3b', borderRadius: '6px', padding: '8px', overflow: 'hidden' }}>
+                                <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>Console</div>
+                                {consoleLog.length === 0 ? (
+                                    <div style={{ color: '#8a8a8a', fontSize: '0.84rem' }}>尚無紀錄</div>
+                                ) : (
+                                    consoleLog.map((line, idx) => (
+                                        <div key={`console-${idx}`} style={{ color: '#9bcf9f', fontSize: '0.82rem', lineHeight: 1.35, borderBottom: '1px solid #272727', padding: '3px 0' }}>
+                                            {line}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -2015,8 +2087,8 @@ const Game = ({ onExit }) => {
                             {mobileInfoTab === 'wave' && waveInfo && (
                                 <div>
                                     <div>波數 {gameState.wave} | 類型 {waveInfo.type} | 血量 {waveInfo.hp}</div>
-                                    <div>出怪 {waveInfo.spawned}/{waveInfo.spawnTarget} | 場上 {waveInfo.alive}</div>
-                                    {nextWaveInfo && <div>下波 {nextWaveInfo.type} | HP {nextWaveInfo.hp} | 目標 {nextWaveInfo.spawnTarget}</div>}
+                                    <div>出怪 {waveInfo.spawned}/{waveInfo.spawnTarget} | Boss 1 | 場上 {waveInfo.alive}</div>
+                                    {nextWaveInfo && <div>下波 {nextWaveInfo.type} | HP {nextWaveInfo.hp} | 目標 {nextWaveInfo.spawnTarget} | Boss 1</div>}
                                 </div>
                             )}
                             {mobileInfoTab === 'towers' && (

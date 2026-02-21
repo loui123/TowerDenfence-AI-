@@ -18,25 +18,32 @@ const RESOURCE_LABELS = {
 };
 
 const TALENT_CATEGORIES = [
-    { id: 'economy', title: 'Economy', talentIds: ['initial_gold', 'player_max_hp'] },
-    { id: 'damage', title: 'Tower Damage', talentIds: ['tower_dmg_base', 'tower_attr_dmg', 'tower_crit_chance'] },
-    { id: 'attack_pattern', title: 'Attack Pattern', talentIds: ['tower_proj_count', 'tower_chain', 'tower_aoe_range'] },
-    { id: 'tempo', title: 'Tempo and Coverage', talentIds: ['tower_atk_speed', 'tower_range', 'game_speed'] },
-    { id: 'level', title: 'Level Rules', talentIds: ['mob_hp_drop', 'mob_density'] }
+    { id: 'level', title: '關卡設定', talentIds: ['initial_gold', 'player_max_hp', 'mob_hp_drop', 'mob_density', 'item_drop_rate'] },
+    { id: 'melee', title: '近戰塔特性', talentIds: ['melee_tower_dmg_base', 'melee_tower_attr_dmg', 'melee_tower_crit_chance', 'melee_tower_atk_speed', 'melee_tower_range'] },
+    { id: 'range', title: '遠程塔特性', talentIds: ['range_tower_dmg_base', 'range_tower_attr_dmg', 'range_tower_atk_speed', 'range_tower_crit_chance', 'range_tower_chain', 'range_tower_proj_count', 'range_tower_range'] },
+    { id: 'spell', title: '法術塔特性', talentIds: ['spell_tower_dmg_base', 'spell_tower_atk_speed', 'spell_tower_range'] }
 ];
 
 const getTalent = (talentId) => Object.values(TALENTS).find((talent) => talent.id === talentId);
 
 const formatTalentEffect = (talentId, perLevel) => {
-    if (talentId === 'tower_proj_count') return `Per level +${perLevel} extra targets`;
-    if (talentId === 'tower_chain') return `Per level +${perLevel} chain jumps`;
-    if (talentId === 'tower_range' || talentId === 'tower_aoe_range') return `Per level +${perLevel} tiles`;
+    if (talentId === 'range_tower_proj_count') return `每級 +${perLevel} 額外攻擊目標`;
+    if (talentId === 'range_tower_chain') return `每級 +${perLevel} 連鎖次數`;
+    if (talentId === 'melee_tower_range' || talentId === 'range_tower_range' || talentId === 'spell_tower_range') return `每級 +${perLevel} 格`;
     if (talentId === 'initial_gold') return `Per level +${perLevel} gold`;
     if (talentId === 'player_max_hp') return `Per level +${perLevel} max HP`;
-    if (talentId === 'mob_hp_drop') return 'Per level +30% mob HP, +10% resource drop';
-    if (talentId === 'mob_density') return 'Per level x2 mob count, same wave duration';
-    if (talentId === 'game_speed') return `Per level +${perLevel.toFixed(2)}x game speed (max x2.00)`;
-    if (talentId === 'tower_attr_dmg' || talentId === 'tower_atk_speed' || talentId === 'tower_crit_chance' || talentId === 'mob_hp_drop' || talentId === 'mob_density') {
+    if (talentId === 'mob_hp_drop') return '每級 +30% 怪物血量，+10% 資源掉落';
+    if (talentId === 'mob_density') return '每級 怪物數量 x2（波次時間不變）';
+    if (talentId === 'item_drop_rate') return `每級 +${Math.floor(perLevel * 100)}% 道具掉落率`;
+    if (
+        talentId === 'melee_tower_attr_dmg'
+        || talentId === 'range_tower_attr_dmg'
+        || talentId === 'melee_tower_atk_speed'
+        || talentId === 'range_tower_atk_speed'
+        || talentId === 'spell_tower_atk_speed'
+        || talentId === 'melee_tower_crit_chance'
+        || talentId === 'range_tower_crit_chance'
+    ) {
         return `Per level +${Math.floor(perLevel * 100)}%`;
     }
     return `Per level +${perLevel}`;
@@ -79,10 +86,12 @@ const TalentNode = ({ talentId, compact = false }) => {
             display: 'flex',
             flexDirection: 'column',
             gap: '6px',
-            minHeight: compact ? '108px' : '122px'
+            minHeight: compact ? '108px' : '122px',
+            minWidth: 0,
+            overflow: 'hidden'
         }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', alignItems: 'center' }}>
-                <div style={{ fontWeight: 700, color: '#f6f6f6', fontSize: compact ? '0.88rem' : '0.95rem', textAlign: 'left' }}>
+                <div style={{ fontWeight: 700, color: '#f6f6f6', fontSize: compact ? '0.88rem' : '0.95rem', textAlign: 'left', minWidth: 0, overflowWrap: 'anywhere' }}>
                     {talent.name}
                 </div>
                 <div style={{
@@ -96,11 +105,11 @@ const TalentNode = ({ talentId, compact = false }) => {
                 </div>
             </div>
 
-            <div style={{ fontSize: compact ? '0.72rem' : '0.8rem', color: '#a9a9a9', textAlign: 'left' }}>
+            <div style={{ fontSize: compact ? '0.72rem' : '0.8rem', color: '#a9a9a9', textAlign: 'left', minWidth: 0, overflowWrap: 'anywhere' }}>
                 {formatTalentEffect(talentId, talent.perLevel)}
             </div>
 
-            <div style={{ marginTop: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <div style={{ marginTop: 'auto', display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '8px' }}>
                 <button
                     disabled={!canAfford}
                     onClick={() => upgradeTalent(talentId)}
@@ -109,9 +118,13 @@ const TalentNode = ({ talentId, compact = false }) => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '6px',
+                        minWidth: 0,
+                        width: '100%',
+                        padding: compact ? '6px 8px' : '7px 8px',
                         fontWeight: 600,
                         fontSize: compact ? '0.74rem' : '0.82rem',
-                        borderColor: canAfford ? RESOURCE_COLORS[talent.costType] : '#4a4a4a'
+                        borderColor: canAfford ? RESOURCE_COLORS[talent.costType] : '#4a4a4a',
+                        whiteSpace: 'nowrap'
                     }}
                 >
                     Upgrade
@@ -127,10 +140,14 @@ const TalentNode = ({ talentId, compact = false }) => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '6px',
+                        minWidth: 0,
+                        width: '100%',
+                        padding: compact ? '6px 8px' : '7px 8px',
                         fontWeight: 600,
                         fontSize: compact ? '0.74rem' : '0.82rem',
                         borderColor: canRefund ? '#67d39a' : '#4a4a4a',
-                        color: canRefund ? '#c9ffe2' : undefined
+                        color: canRefund ? '#c9ffe2' : undefined,
+                        whiteSpace: 'nowrap'
                     }}
                 >
                     Refund
@@ -150,10 +167,12 @@ const TalentSection = ({ title, talentIds, compact = false }) => (
         padding: compact ? '8px' : '10px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px'
+        gap: '8px',
+        minWidth: 0,
+        overflow: 'hidden'
     }}>
         <h3 style={{ textAlign: 'left', fontSize: compact ? '0.9rem' : '0.95rem', letterSpacing: '0.02em', margin: 0 }}>{title}</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : 'repeat(auto-fit, minmax(250px, 1fr))', gap: '8px', minWidth: 0 }}>
             {talentIds.map((talentId) => <TalentNode key={talentId} talentId={talentId} compact={compact} />)}
         </div>
     </section>

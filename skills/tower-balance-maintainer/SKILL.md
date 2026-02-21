@@ -10,11 +10,14 @@ Keep game-balance edits and balance documentation synchronized.
 ## Follow This Workflow
 
 1. Read `references/current-values.md` to understand current balance targets and formulas.
-2. Apply requested value changes in code first:
+2. Apply requested value/mechanics/UI changes in code first:
    - `src/data/constants.js` for tower base stats, talent definitions, wave config.
    - `src/engine/GameEngine.js` for actual combat formulas and runtime behavior.
-   - `src/components/Game/Game.jsx` only when UI text/colors/presented stats must match the mechanics.
-3. Update `references/current-values.md` in the same edit to reflect exact new values.
+   - `src/components/Game/Game.jsx` when player-facing combat info, map readability, panel behavior, notices, or console presentation changes.
+3. Update documentation in the same edit:
+   - Always sync `references/current-values.md`.
+   - Sync `references/item-system.md` if item/equipment behavior changes.
+   - Sync `references/monster-info.md` if drop tables or wave-facing monster info changes.
 4. Run `npm run build` to catch syntax/integration errors.
 5. Report changed values explicitly (old -> new) and include touched file paths.
 
@@ -31,3 +34,8 @@ Keep game-balance edits and balance documentation synchronized.
 - Tower hit logic, status stacking, chain, specialization: `src/engine/GameEngine.js`
 - Projectile color and in-battle display values: `src/components/Game/Game.jsx`
 - Player-facing talent descriptions: `src/components/MainMenu/TalentTree.jsx`
+- Skill docs source-of-truth:
+  - `skills/tower-balance-maintainer/references/current-values.md`
+  - `skills/tower-balance-maintainer/references/item-system.md`
+  - `skills/tower-balance-maintainer/references/monster-info.md`
+  - `skills/tower-balance-maintainer/references/menu-talent-tree.md`
