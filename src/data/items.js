@@ -1,4 +1,4 @@
-export const ITEM_TYPES = {
+﻿export const ITEM_TYPES = {
     CONSUMABLE: 'consumable',
     EQUIPMENT: 'equipment'
 };
@@ -6,9 +6,9 @@ export const ITEM_TYPES = {
 export const ITEM_DEFS = {
     level_book: {
         id: 'level_book',
-        name: '等級之書',
+        name: '經驗之書',
         type: ITEM_TYPES.CONSUMABLE,
-        description: '升級塔 1 級（不可對滿等塔使用）',
+        description: '立即讓塔升級 1 次（滿級塔無法使用）。',
         icon: 'Lv',
         source: 'water'
     },
@@ -16,7 +16,7 @@ export const ITEM_DEFS = {
         id: 'speed_book',
         name: '速度之書',
         type: ITEM_TYPES.CONSUMABLE,
-        description: '塔攻擊速度 +10%',
+        description: '塔的攻擊速度 +10%。',
         icon: '速',
         source: 'wood'
     },
@@ -24,7 +24,7 @@ export const ITEM_DEFS = {
         id: 'power_book',
         name: '力量之書',
         type: ITEM_TYPES.CONSUMABLE,
-        description: '塔基礎傷害 +10%',
+        description: '塔的傷害 +10%。',
         icon: '力',
         source: 'fire'
     },
@@ -32,7 +32,7 @@ export const ITEM_DEFS = {
         id: 'crit_book',
         name: '暴擊之書',
         type: ITEM_TYPES.CONSUMABLE,
-        description: '塔暴擊機率 +10%',
+        description: '塔的暴擊率 +10%（最高 100%）。',
         icon: '暴',
         source: 'all'
     },
@@ -40,7 +40,7 @@ export const ITEM_DEFS = {
         id: 'build_book',
         name: '建設之書',
         type: ITEM_TYPES.CONSUMABLE,
-        description: '本局可建塔上限 +1',
+        description: '本局可建造塔上限 +1。',
         icon: '建',
         source: 'boss'
     },
@@ -48,48 +48,56 @@ export const ITEM_DEFS = {
         id: 'lubricant',
         name: '潤滑油',
         type: ITEM_TYPES.EQUIPMENT,
-        description: '裝備後將塔的基礎攻擊速度改為 1（不可卸下）',
-        icon: '油',
+        description: '裝備後，該塔基礎攻速改為 1（仍可受天賦與靈氣影響）。',
+        icon: '潤',
         source: 'all'
     },
     full_firepower: {
         id: 'full_firepower',
         name: '火力全開',
         type: ITEM_TYPES.EQUIPMENT,
-        description: '裝備後將塔的基礎攻擊力改為 40（不可卸下）',
+        description: '裝備後，該塔基礎攻擊力改為 40（仍可受天賦與靈氣影響）。',
         icon: '火',
         source: 'all'
     },
+    absorption_force: {
+        id: 'absorption_force',
+        name: '吸收之力',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '每擊殺一隻怪物，該塔基礎攻擊力 +1。',
+        icon: '吸',
+        source: 'talent'
+    },
     chain_lightning: {
         id: 'chain_lightning',
-        name: '閃電鏈',
+        name: '連鎖雷擊',
         type: ITEM_TYPES.EQUIPMENT,
-        description: '攻擊命中觸發連鎖閃電（20 傷害、連鎖 20 次、10% 機率麻痺 1 秒）',
-        icon: '鏈',
+        description: '攻擊命中時，對同目標追加連鎖雷擊（20 傷害，10% 機率麻痺 1 秒）。',
+        icon: '雷',
         source: 'all'
     },
     courage_banner: {
         id: 'courage_banner',
-        name: '勇氣旗幟',
+        name: '勇氣戰旗',
         type: ITEM_TYPES.EQUIPMENT,
-        description: '附近 3 格塔的暴擊機率 +25%（可疊加）',
+        description: '附近 3 格友方塔暴擊率 +25%。',
         icon: '勇',
         source: 'all'
     },
     slaughter_banner: {
         id: 'slaughter_banner',
-        name: '殺戮旗幟',
+        name: '殺戮戰旗',
         type: ITEM_TYPES.EQUIPMENT,
-        description: '附近 3 格塔的暴擊傷害 +40%（可疊加）',
+        description: '附近 3 格友方塔暴擊傷害 +40%。',
         icon: '殺',
         source: 'all'
     },
     agility_banner: {
         id: 'agility_banner',
-        name: '靈活旗幟',
+        name: '敏捷戰旗',
         type: ITEM_TYPES.EQUIPMENT,
-        description: '附近 3 格塔的攻擊速度 +10%（可疊加）',
-        icon: '靈',
+        description: '附近 3 格友方塔攻速 +10%。',
+        icon: '敏',
         source: 'all'
     }
 };

@@ -1,4 +1,4 @@
-
+﻿
 import { TOWER_TYPES, MONSTER_TYPES, WAVE_CONFIG, TALENTS, RESOURCES } from '../data/constants';
 import { ITEM_DEFS, ITEM_TYPES, MONSTER_ITEM_DROP_TABLE } from '../data/items';
 
@@ -81,7 +81,7 @@ export class GameEngine {
                 id,
                 name: '暈眩效果硬質',
                 value: 0.5,
-                desc: '每一秒最多承受 0.5 秒暈眩'
+                desc: '每 1 秒最多承受 0.5 秒暈眩'
             };
         }
         if (id === 'stun_duration_reduction') {
@@ -98,7 +98,7 @@ export class GameEngine {
                 id,
                 name: '麻痺效果硬質',
                 value: 0.1,
-                desc: '每一秒最多承受 0.1 秒麻痺'
+                desc: '每 1 秒最多承受 0.1 秒麻痺'
             };
         }
         if (id === 'crit_damage_reduction') {
@@ -107,7 +107,7 @@ export class GameEngine {
                 id,
                 name: '暴擊傷害減免',
                 value: reduction,
-                desc: `承受暴擊傷害減少 ${(reduction * 100).toFixed(0)}%（不低於 0%）`
+                desc: `承受暴擊傷害減少 ${(reduction * 100).toFixed(0)}%（不得低於 0%）`
             };
         }
         if (id === 'melee_dmg_reduction') return { id, name: '近戰傷害減免', value: 0.3, desc: '承受近戰傷害減少 30%' };
@@ -130,7 +130,7 @@ export class GameEngine {
             const hpUp = 0.1 + ((0.6 - 0.1) * progress);
             return {
                 id,
-                name: '增加怪物生命%數',
+                name: '怪物生命提升',
                 value: hpUp,
                 desc: `怪物生命增加 ${(hpUp * 100).toFixed(0)}%`
             };
@@ -859,6 +859,11 @@ export class GameEngine {
 
         if (!tower) return;
 
+        if (tower.equipmentId === 'absorption_force') {
+            tower.absorptionKillCount = (tower.absorptionKillCount || 0) + 1;
+            tower.stats.damage = (tower.stats.damage || 0) + 1;
+        }
+
         this.grantSupportExpFromNearbyKill(tower);
 
         if (tower.redistributeKillExp && this.towers.length > 1) {
@@ -1238,7 +1243,7 @@ export class GameEngine {
 
     getMobDensityMultiplier() {
         const level = this.talents.mob_density || 0;
-        return Math.pow(2, level);
+        return Math.pow(1.4, level);
     }
 
     getGameSpeedMultiplier() {
@@ -1608,44 +1613,44 @@ export class GameEngine {
 
     applyInventoryItem(tower, itemId) {
         if (!tower || !itemId) {
-            return { ok: false, message: '無效的目標或道具' };
+            return { ok: false, message: '請先選擇塔與道具。' };
         }
 
         const item = ITEM_DEFS[itemId];
         if (!item) {
-            return { ok: false, message: '找不到道具定義' };
+            return { ok: false, message: '找不到該道具。' };
         }
 
         if (item.type === ITEM_TYPES.CONSUMABLE) {
             if (itemId === 'level_book') {
                 if (tower.level >= 10) {
-                    return { ok: false, message: '滿等塔無法使用等級之書' };
+                    return { ok: false, message: '該塔已滿級，無法再升級。' };
                 }
                 this.levelUpTower(tower, 1);
-                return { ok: true, message: `${item.name} 已使用` };
+                return { ok: true, message: `${item.name} 使用成功` };
             }
             if (itemId === 'speed_book') {
                 tower.stats.speed *= 1.1;
-                return { ok: true, message: `${item.name} 已使用` };
+                return { ok: true, message: `${item.name} 使用成功` };
             }
             if (itemId === 'power_book') {
                 tower.stats.damage *= 1.1;
-                return { ok: true, message: `${item.name} 已使用` };
+                return { ok: true, message: `${item.name} 使用成功` };
             }
             if (itemId === 'crit_book') {
                 tower.stats.crit = Math.min(1, (tower.stats.crit || 0) + 0.1);
-                return { ok: true, message: `${item.name} 已使用` };
+                return { ok: true, message: `${item.name} 使用成功` };
             }
             if (itemId === 'build_book') {
                 this.towerLimitBonus = (this.towerLimitBonus || 0) + 1;
-                return { ok: true, message: `${item.name} 已使用（本局建塔上限 +1）` };
+                return { ok: true, message: `${item.name} 使用成功，本局建塔上限 +1` };
             }
-            return { ok: false, message: '此消耗道具尚未實作' };
+            return { ok: false, message: '此消耗道具尚未實作效果。' };
         }
 
         if (item.type === ITEM_TYPES.EQUIPMENT) {
             if (tower.equipmentId) {
-                return { ok: false, message: '每座塔只能裝備一件裝備，且無法卸下' };
+                return { ok: false, message: '此塔已裝備道具，無法重複裝備。' };
             }
 
             if (itemId === 'lubricant') {
@@ -1664,22 +1669,23 @@ export class GameEngine {
                 const previousBaseWithTalent = Math.max(0.0001, (typeBaseDamage + talentBaseBonus) * talentAttrMult);
                 const existingBonusMult = Math.max(0, (tower.stats.damage || 0) / previousBaseWithTalent);
                 tower.stats.damage = Math.max(0, (40 + talentBaseBonus) * talentAttrMult * existingBonusMult);
+            } else if (itemId === 'absorption_force') {
+                tower.absorptionKillCount = tower.absorptionKillCount || 0;
             } else if (
                 itemId !== 'chain_lightning'
                 && itemId !== 'courage_banner'
                 && itemId !== 'slaughter_banner'
                 && itemId !== 'agility_banner'
-                && itemId !== 'full_firepower'
             ) {
-                return { ok: false, message: '此裝備尚未實作' };
+                return { ok: false, message: '此裝備尚未實作效果。' };
             }
 
             tower.equipmentId = itemId;
             tower.equipmentName = item.name;
-            return { ok: true, message: `${item.name} 裝備完成` };
+            return { ok: true, message: `${item.name} 裝備成功` };
         }
 
-        return { ok: false, message: '未知道具類型' };
+        return { ok: false, message: '未知的道具類型。' };
     }
 
     getBannerAuraBonuses(targetTower) {
@@ -2110,3 +2116,5 @@ export class GameEngine {
         mob.y = n1.y + (n2.y - n1.y) * mob.progress;
     }
 }
+
+

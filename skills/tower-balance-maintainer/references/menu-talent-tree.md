@@ -14,7 +14,8 @@
 - `item_drop_rate`：道具掉落率（每級 +10%）
 - `tower_limit`：可建塔上限（每級 +1）
 - `mob_hp_drop`：怪物血量與資源掉落（每級怪物血量 +30%、資源 +10%）
-- `mob_density`：怪物密集度（每級密度 x2）
+- `mob_density`：怪物密集度（每級密度 x1.4）
+- `boss_count`：首領數量（每關數量 +1）
 
 ### 2.2 近戰塔特性（紅水晶）
 - `melee_tower_dmg_base`：每級 +1 基礎傷害
@@ -61,7 +62,7 @@
 - 初始生命：`1 + floor(getTalentValue('player_max_hp'))`
 - 怪物血量倍率：`1 + talents.mob_hp_drop * 0.3`
 - 資源掉落倍率：`1 + talents.mob_hp_drop * 0.1`
-- 怪物密集度倍率：`2^(talents.mob_density)`
+- 怪物密集度倍率：`1.4^(talents.mob_density)`
 - 建塔上限：`5 + floor(getTalentValue('tower_limit'))`
 - 道具掉落倍率：`1 + getTalentValue('item_drop_rate')`
 
@@ -82,3 +83,11 @@
    - `src/engine/GameEngine.js`
 2. 若影響資源成本，也同步檢查 `src/contexts/GameContext.jsx`。
 3. 更新本檔 `skills/tower-balance-maintainer/references/menu-talent-tree.md`。
+
+## 2026-02-22 �s�W�G�˳Ƥѽ�i�˳�-�l�����O�j
+- �ѽ� id�Gequip_absorption_force
+- ���Ӹ귽�Ggold_ore
+- ��¦��O�G100
+- �̤j���šG1
+- �ĪG�G�}�l�C���ɡA�I�]��o�˳� bsorption_force x1�C
+- ����G���˳ƨӷ��ȭ��D���ѽ�A���|�ѩǪ������C

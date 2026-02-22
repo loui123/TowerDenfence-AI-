@@ -66,6 +66,7 @@ export const TALENTS = {
   TOWER_LIMIT: { id: 'tower_limit', name: '增加可建塔上限', costType: RESOURCES.ENERGY, baseCost: 30, perLevel: 1 },
   MOB_HP_DROP: { id: 'mob_hp_drop', name: '增加怪物血量與資源掉落', costType: RESOURCES.GOLD_ORE, baseCost: 10, perLevel: 0.3, dropPerLevel: 0.1 },
   MOB_DENSITY: { id: 'mob_density', name: '增加怪物密集度', costType: RESOURCES.GOLD_ORE, baseCost: 20, perLevel: 1 },
+  EQUIP_ABSORPTION_FORCE: { id: 'equip_absorption_force', name: '裝備-吸收之力', costType: RESOURCES.GOLD_ORE, baseCost: 100, perLevel: 1, maxLevel: 1 },
 
   // 近戰塔特性（紅水晶）
   MELEE_TOWER_DMG_BASE: { id: 'melee_tower_dmg_base', name: '增加塔基礎傷害', costType: RESOURCES.RED_CRYSTAL, baseCost: 10, perLevel: 1 },

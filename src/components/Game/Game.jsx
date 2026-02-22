@@ -4,7 +4,7 @@ import { GameEngine } from '../../engine/GameEngine';
 import { useGame } from '../../contexts/GameContext';
 import { RESOURCES, TOWER_TYPES } from '../../data/constants';
 import { ITEM_DEFS, ITEM_TYPES } from '../../data/items';
-import { Heart, Play, FastForward } from 'lucide-react';
+import { Heart } from 'lucide-react';
 
 const CELL_SIZE = 40;
 const INITIAL_CRIT_DMG = 2.0;
@@ -285,8 +285,8 @@ const Game = ({ onExit }) => {
     const canvasRef = useRef(null);
     const engineRef = useRef(null);
     const visualsRef = useRef({});
-    const autoNextWaveRef = useRef(false);
     const topBarRef = useRef(null);
+    const waveStartTimeoutRef = useRef(null);
     const audioCtxRef = useRef(null);
     const bgmGainRef = useRef(null);
     const sfxGainRef = useRef(null);
@@ -297,6 +297,9 @@ const Game = ({ onExit }) => {
     const combatSfxCooldownRef = useRef({ attack: 0, explosion: 0 });
     const sessionStartRef = useRef(Date.now());
     const exitHandledRef = useRef(false);
+    const isPausedRef = useRef(false);
+    const isInteractionModalOpenRef = useRef(false);
+    const gameOverRef = useRef(false);
 
     const [mapData] = useState(() => generateMap(15, 15));
     const [grid, setGrid] = useState(mapData.grid);
@@ -314,7 +317,7 @@ const Game = ({ onExit }) => {
     });
 
     const [gameOver, setGameOver] = useState(false);
-    const [autoNextWave, setAutoNextWave] = useState(false);
+    const [isPaused, setIsPaused] = useState(false);
 
     const [buildTarget, setBuildTarget] = useState(null); // {x, y}
     const [upgradeTarget, setUpgradeTarget] = useState(null); // {x, y}
@@ -325,7 +328,13 @@ const Game = ({ onExit }) => {
         width: typeof window !== 'undefined' ? window.innerWidth : 1280,
         height: typeof window !== 'undefined' ? window.innerHeight : 720
     });
-    const [inventory, setInventory] = useState([]); // [{id, count}]
+    const [inventory, setInventory] = useState(() => {
+        const initial = [];
+        if ((talents?.equip_absorption_force || 0) > 0) {
+            initial.push({ id: 'absorption_force', count: 1 });
+        }
+        return initial;
+    }); // [{id, count}]
     const [selectedItemId, setSelectedItemId] = useState(null);
     const [, setDropLog] = useState([]);
     const [consoleLog, setConsoleLog] = useState([]);
@@ -341,6 +350,36 @@ const Game = ({ onExit }) => {
     const [sfxEnabled, setSfxEnabled] = useState(settings?.sfxEnabled !== false);
 
     const isInteractionModalOpen = !!buildTarget || !!upgradeTarget;
+
+    const clearAutoWaveTimer = () => {
+        if (waveStartTimeoutRef.current) {
+            window.clearTimeout(waveStartTimeoutRef.current);
+            waveStartTimeoutRef.current = null;
+        }
+    };
+
+    const queueAutoWaveStart = (delayMs = 2000) => {
+        clearAutoWaveTimer();
+        const tryStartWave = () => {
+            const eng = engineRef.current;
+            if (!eng || eng.hp <= 0 || eng.victory) {
+                waveStartTimeoutRef.current = null;
+                return;
+            }
+            if (eng.waveActive) {
+                waveStartTimeoutRef.current = null;
+                return;
+            }
+            if (eng.paused || isPausedRef.current || isInteractionModalOpenRef.current || gameOverRef.current) {
+                waveStartTimeoutRef.current = window.setTimeout(tryStartWave, 250);
+                return;
+            }
+            triggerSfx('wave');
+            eng.startNextWave();
+            waveStartTimeoutRef.current = null;
+        };
+        waveStartTimeoutRef.current = window.setTimeout(tryStartWave, delayMs);
+    };
 
     const handleExitWithRecord = () => {
         if (exitHandledRef.current) return;
@@ -364,16 +403,24 @@ const Game = ({ onExit }) => {
     };
 
     useEffect(() => {
-        autoNextWaveRef.current = autoNextWave;
-    }, [autoNextWave]);
-
-    useEffect(() => {
         const nextBgmEnabled = settings?.bgmEnabled !== false;
         const nextSfxEnabled = settings?.sfxEnabled !== false;
         setBgmEnabled(nextBgmEnabled);
         setSfxEnabled(nextSfxEnabled);
         sfxEnabledRef.current = nextSfxEnabled;
     }, [settings?.bgmEnabled, settings?.sfxEnabled]);
+
+    useEffect(() => {
+        isPausedRef.current = isPaused;
+    }, [isPaused]);
+
+    useEffect(() => {
+        isInteractionModalOpenRef.current = isInteractionModalOpen;
+    }, [isInteractionModalOpen]);
+
+    useEffect(() => {
+        gameOverRef.current = gameOver;
+    }, [gameOver]);
 
     useEffect(() => {
         sfxEnabledRef.current = sfxEnabled;
@@ -413,7 +460,7 @@ const Game = ({ onExit }) => {
         updateHeight();
         window.addEventListener('resize', updateHeight);
         return () => window.removeEventListener('resize', updateHeight);
-    }, [viewport.width, gameState.waveActive, gameOver, autoNextWave]);
+    }, [viewport.width, gameState.waveActive, gameOver, isPaused]);
 
     const ensureAudioContext = () => {
         if (typeof window === 'undefined') return null;
@@ -588,16 +635,14 @@ const Game = ({ onExit }) => {
             onGameOver: () => {
                 triggerSfx('defeat');
                 setGameOver(true);
+                setIsPaused(false);
+                clearAutoWaveTimer();
                 engine.stop();
             },
             onWaveComplete: (wave) => {
                 triggerSfx('wave');
                 appendConsoleLog(`第 ${wave - 1} 波完成`);
-                if (autoNextWaveRef.current) {
-                    setTimeout(() => {
-                        if (engineRef.current) engineRef.current.startNextWave();
-                    }, 200);
-                }
+                queueAutoWaveStart(2000);
             },
             onResourceDrop: (type, amount) => {
                 addResource(type, amount);
@@ -649,6 +694,7 @@ const Game = ({ onExit }) => {
 
         engineRef.current = engine;
         engine.start();
+        queueAutoWaveStart(2000);
 
         let animationFrameId;
         const renderLoop = () => {
@@ -731,6 +777,7 @@ const Game = ({ onExit }) => {
                 let projectileColor = '#ffd54a';
                 if (proj.sourceTower?.type === 'projectile_slow') projectileColor = '#66b8ff';
                 if (proj.sourceTower?.type === 'projectile') projectileColor = '#ffd54a';
+                if (proj.sourceTower?.type === 'projectile_aoe') projectileColor = '#ff4d4d';
                 if (proj.sourceTower?.type === 'magic') projectileColor = '#b67bff';
                 ctx.fillStyle = projectileColor;
                 ctx.beginPath();
@@ -822,19 +869,21 @@ const Game = ({ onExit }) => {
         return () => {
             engine.stop();
             cancelAnimationFrame(animationFrameId);
+            clearAutoWaveTimer();
+            engineRef.current = null;
         };
     }, []);
 
     useEffect(() => {
         if (!engineRef.current) return;
 
-        if (gameOver || isInteractionModalOpen) {
+        if (gameOver || isInteractionModalOpen || isPaused) {
             engineRef.current.stop();
             return;
         }
 
         engineRef.current.resume();
-    }, [gameOver, isInteractionModalOpen]);
+    }, [gameOver, isInteractionModalOpen, isPaused]);
 
     const upgradeTower = useMemo(() => {
         if (!upgradeTarget || !engineRef.current) return null;
@@ -1025,12 +1074,12 @@ const Game = ({ onExit }) => {
         }
     }, [upgradeTower]);
 
-    const handleStartWave = () => {
-        if (!engineRef.current) return;
-        ensureAudioContext();
-        startBgmLoop();
-        triggerSfx('wave');
-        engineRef.current.startNextWave();
+    const handleTogglePause = () => {
+        if (!engineRef.current || gameOver) return;
+        const nextPaused = !isPaused;
+        setIsPaused(nextPaused);
+        if (!nextPaused && !engineRef.current.waveActive) queueAutoWaveStart(2000);
+        appendConsoleLog(nextPaused ? '遊戲暫停' : '遊戲繼續');
     };
 
     const changeGameSpeed = (direction) => {
@@ -1440,7 +1489,6 @@ const Game = ({ onExit }) => {
                 <span style={{ color: 'gold', fontWeight: 'bold' }}>金幣 {Math.floor(gameState.gold)}</span>
                 <span style={{ color: 'red', display: 'flex', alignItems: 'center', gap: '5px' }}><Heart size={16} /> {gameState.hp}/{gameState.maxHp}</span>
                 <span style={{ color: '#aaa' }}>波數: {gameState.wave}</span>
-                <span>怪物: {gameState.mobsCount}</span>
                 <span style={{ color: '#b9d4ff' }}>塔數: {towerCount}/{towerLimit}</span>
                 <span style={{ color: '#8ec5ff', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     速度 x{gameState.gameSpeed.toFixed(2)}
@@ -1471,24 +1519,17 @@ const Game = ({ onExit }) => {
                     </>
                 )}
 
-                {!gameState.waveActive && !gameOver && (
-                    <button onClick={handleStartWave} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'green', border: 'none' }}>
-                        <Play size={16} fill="white" /> 下一波
-                    </button>
-                )}
-
                 <button
-                    onClick={() => setAutoNextWave((prev) => !prev)}
-                    title={autoNextWave ? '目前: 開' : '目前: 關'}
+                    onClick={handleTogglePause}
                     style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '6px',
-                        background: autoNextWave ? '#0e6b2a' : '#333',
-                        border: `1px solid ${autoNextWave ? '#54d67a' : '#555'}`
+                        background: isPaused ? '#6b4b0e' : '#333',
+                        border: `1px solid ${isPaused ? '#e0b35a' : '#555'}`
                     }}
                 >
-                    <FastForward size={14} /> 跳關
+                    {isPaused ? '繼續' : '暫停'}
                 </button>
 
                 <button onClick={handleExitWithRecord} style={{ marginLeft: 'auto' }}>離開</button>
@@ -2218,37 +2259,120 @@ const Game = ({ onExit }) => {
                         )}
 
                         <div style={{ fontSize: '0.76rem', lineHeight: 1.35, overflowY: 'auto', minHeight: 0 }}>
-                            {(mobilePanelTab === 'wave' || mobileInfoTab === 'wave') && mobilePanelTab === 'wave' && waveInfo && (
-                                <div>
-                                    <div>波數 {gameState.wave} | 類型 {waveInfo.type} | 血量 {waveInfo.hp}</div>
-                                    <div>出怪 {waveInfo.spawned}/{waveInfo.spawnTarget} | Boss 1 | 場上 {waveInfo.alive}</div>
-                                    <div>詞墜 {waveInfo.affixes?.length ? waveInfo.affixes.map((a) => a.name).join('、') : '無'}</div>
-                                    {nextWaveInfo && <div>下波 {nextWaveInfo.type} | HP {nextWaveInfo.hp} | 目標 {nextWaveInfo.spawnTarget} | Boss 1</div>}
-                                </div>
+                            {(mobilePanelTab === 'wave' || mobileInfoTab === 'wave') && mobilePanelTab === 'wave' && (
+                                waveInfo ? (
+                                    <div style={{ display: 'grid', gap: '8px' }}>
+                                        <div style={{ color: '#8dd2ff', fontSize: '0.8rem' }}>當波怪物資訊</div>
+                                        <div style={{ border: '1px solid #2f2f2f', borderRadius: '6px', padding: '6px' }}>
+                                            <div>波數: {gameState.wave}</div>
+                                            <div>怪物類型: {waveInfo.type}</div>
+                                            <div>單位生命值: {waveInfo.hp}</div>
+                                            <div>基礎移動速度: {waveInfo.speed.toFixed(2)}</div>
+                                            <div>目標出怪數: {waveInfo.spawnTarget}</div>
+                                            <div>波尾 Boss: {waveInfo.bossCount}</div>
+                                            <div>已出怪數: {waveInfo.spawned}</div>
+                                            <div>場上存活: {waveInfo.alive}</div>
+                                            <div>關卡血量倍率: x{waveInfo.hpScale.toFixed(2)}</div>
+                                            <div style={{ marginTop: '4px', color: '#f7d9a7' }}>
+                                                詞墜: {waveInfo.affixes?.length ? waveInfo.affixes.map((a) => a.name).join('、') : '無'}
+                                            </div>
+                                            {waveInfo.affixes?.length > 0 && (
+                                                <div style={{ color: '#c2d6e8' }}>
+                                                    {waveInfo.affixes.map((a) => a.desc).join(' / ')}
+                                                </div>
+                                            )}
+                                        </div>
+                                        {nextWaveInfo && (
+                                            <>
+                                                <div style={{ color: '#8dd2ff', fontSize: '0.8rem' }}>下波怪物資訊</div>
+                                                <div style={{ border: '1px solid #2f2f2f', borderRadius: '6px', padding: '6px' }}>
+                                                    <div>波數: {nextWaveInfo.wave}</div>
+                                                    <div>怪物類型: {nextWaveInfo.type}</div>
+                                                    <div>單位生命值: {nextWaveInfo.hp}</div>
+                                                    <div>基礎移動速度: {nextWaveInfo.speed.toFixed(2)}</div>
+                                                    <div>目標出怪數: {nextWaveInfo.spawnTarget}</div>
+                                                    <div>波尾 Boss: {nextWaveInfo.bossCount}</div>
+                                                    <div>關卡血量倍率: x{nextWaveInfo.hpScale.toFixed(2)}</div>
+                                                    <div style={{ marginTop: '4px', color: '#f7d9a7' }}>
+                                                        詞墜: {nextWaveInfo.affixes?.length ? nextWaveInfo.affixes.map((a) => a.name).join('、') : '無'}
+                                                    </div>
+                                                    {nextWaveInfo.affixes?.length > 0 && (
+                                                        <div style={{ color: '#c2d6e8' }}>
+                                                            {nextWaveInfo.affixes.map((a) => a.desc).join(' / ')}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div style={{ color: '#8a8a8a' }}>尚無關卡資訊</div>
+                                )
                             )}
                             {(mobilePanelTab === 'towers' || mobileInfoTab === 'towers') && mobilePanelTab === 'towers' && (
                                 towerRows.length === 0 ? (
                                     <div style={{ color: '#8a8a8a' }}>目前還沒有塔</div>
                                 ) : (
-                                    towerRows.slice(0, 4).map((row) => (
-                                        <div key={`mobile-tower-${row.id}`}>
-                                            {row.name} Lv.{row.level} | 升級 {row.pendingUpgrades} | 專精 {row.pendingSpecialization ? '是' : '否'}
-                                            {row.supportAuraType
-                                                ? ` | 靈氣 ${row.supportAuraType} +${(row.supportAuraStatus?.effectPct || 0).toFixed(0)}%`
-                                                : ` | 靈氣傷 +${(row.auraSnapshot?.damagePct || 0).toFixed(0)}%`}
-                                        </div>
-                                    ))
+                                    <div style={{ display: 'grid', gap: '6px' }}>
+                                        {towerRows.map((row) => (
+                                            <div
+                                                key={`mobile-tower-${row.id}`}
+                                                onClick={() => setSelectedTowerId(row.id)}
+                                                style={{
+                                                    border: selectedTowerId === row.id ? '1px solid #55c18f' : '1px solid #2f2f2f',
+                                                    background: selectedTowerId === row.id ? 'rgba(85, 193, 143, 0.14)' : 'transparent',
+                                                    borderRadius: '6px',
+                                                    padding: '6px'
+                                                }}
+                                            >
+                                                <div style={{ color: '#f0f0f0' }}>{row.name} Lv.{row.level}</div>
+                                                {row.supportAuraType ? (
+                                                    <div style={{ color: '#bcbcbc' }}>
+                                                        待升級: {row.pendingUpgrades} | 待專精: {row.pendingSpecialization ? '是' : '否'} | EXP: {row.supportExp}/15 | 靈氣: {row.supportAuraType} | 範圍: {row.supportAuraRange}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ color: '#bcbcbc' }}>
+                                                        待升級: {row.pendingUpgrades} | 待專精: {row.pendingSpecialization ? '是' : '否'} | K: {row.kills} | Dmg: {row.damage}
+                                                    </div>
+                                                )}
+                                                {row.supportAuraStatus ? (
+                                                    <div style={{ color: '#8de8df' }}>
+                                                        靈氣效果 +{(row.supportAuraStatus.effectPct || 0).toFixed(0)}% | 影響塔 {row.supportAuraStatus.affectedTowerCount || 0}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ color: '#ffd99b' }}>
+                                                        靈氣加成: 傷 +{(row.auraSnapshot?.damagePct || 0).toFixed(0)}% | 速 +{(row.auraSnapshot?.speedPct || 0).toFixed(0)}% | 暴 +{(row.auraSnapshot?.critChancePct || 0).toFixed(0)}%
+                                                    </div>
+                                                )}
+                                                {row.equipmentName && (
+                                                    <div style={{ color: '#9ad7ff' }}>裝備: {row.equipmentName}</div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
                                 )
                             )}
                             {(mobilePanelTab === 'rank' || mobileInfoTab === 'rank') && mobilePanelTab === 'rank' && (
                                 towerRankRows.length === 0 ? (
                                     <div style={{ color: '#8a8a8a' }}>目前沒有可排名的塔</div>
                                 ) : (
-                                    towerRankRows.slice(0, 4).map((row, idx) => (
-                                        <div key={`mobile-rank-${row.id}`}>
-                                            #{idx + 1} {row.name} Lv.{row.level} | 傷害 {row.damage} | 擊殺 {row.kills}
-                                        </div>
-                                    ))
+                                    <div style={{ display: 'grid', gap: '6px' }}>
+                                        {towerRankRows.map((row, idx) => (
+                                            <div key={`mobile-rank-${row.id}`} style={{ border: '1px solid #2f2f2f', borderRadius: '6px', padding: '6px' }}>
+                                                <div style={{ color: '#f0f0f0' }}>#{idx + 1} {row.name} Lv.{row.level}</div>
+                                                <div style={{ color: '#bcbcbc' }}>傷害 {row.damage} | 擊殺 {row.kills} | DPS {row.dps.toFixed(1)}</div>
+                                                {row.supportAuraType ? (
+                                                    <div style={{ color: '#8de8df' }}>
+                                                        靈氣: {row.supportAuraType} | 效果 +{(row.supportAuraStatus?.effectPct || 0).toFixed(0)}%
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ color: '#ffd99b' }}>
+                                                        靈氣加成: 傷 +{(row.auraSnapshot?.damagePct || 0).toFixed(0)}% | 速 +{(row.auraSnapshot?.speedPct || 0).toFixed(0)}%
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
                                 )
                             )}
                             {(mobilePanelTab === 'consumable' || mobilePanelTab === 'equipment') && (

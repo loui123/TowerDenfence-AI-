@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { useGame } from '../../contexts/GameContext';
 import { TALENTS, RESOURCES } from '../../data/constants';
 import { ArrowLeft, Zap, Gem, Pickaxe } from 'lucide-react';
@@ -20,7 +20,7 @@ const RESOURCE_LABELS = {
 };
 
 const TALENT_CATEGORIES = [
-    { id: 'level_config', title: '關卡設定', talentIds: ['initial_gold', 'player_max_hp', 'item_drop_rate', 'tower_limit', 'mob_hp_drop', 'mob_density'] },
+    { id: 'level_config', title: '關卡設定', talentIds: ['initial_gold', 'player_max_hp', 'item_drop_rate', 'tower_limit', 'mob_hp_drop', 'mob_density', 'equip_absorption_force'] },
     {
         id: 'melee',
         title: '近戰塔特性',
@@ -48,7 +48,8 @@ const formatTalentEffect = (talentId, perLevel) => {
     if (talentId === 'player_max_hp') return `每級 +${perLevel} 最大生命`;
     if (talentId === 'tower_limit') return `每級 +${perLevel} 可建塔上限`;
     if (talentId === 'mob_hp_drop') return '每級 +30% 怪物血量、+10% 資源掉落';
-    if (talentId === 'mob_density') return '每級怪物密度 x2（同波時長）';
+    if (talentId === 'mob_density') return '每級怪物密度 x1.4（同波時長）';
+    if (talentId === 'equip_absorption_force') return '最多 1 次，開始遊戲獲得裝備「吸收之力」';
     if (talentId === 'item_drop_rate') return `每級 +${Math.floor(perLevel * 100)}% 道具掉落率`;
     if (
         talentId.endsWith('_attr_dmg')
@@ -206,21 +207,23 @@ const TalentTree = ({ onBack }) => {
     return (
         <div style={{
             padding: isMobile ? '10px' : '16px',
-            height: '100%',
+            height: '100dvh',
+            maxHeight: '100dvh',
             width: 'min(1700px, 100vw)',
             maxWidth: '100%',
             boxSizing: 'border-box',
             display: 'flex',
             flexDirection: 'column',
             gap: '14px',
-            overflow: 'hidden'
+            overflowY: 'auto',
+            overflowX: 'hidden'
         }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', justifyItems: 'center', gap: '10px' }}>
                 <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '5px', justifySelf: 'start' }}>
                     <ArrowLeft size={16} />
                     返回
                 </button>
-                <h2 style={{ fontSize: isMobile ? '1.45rem' : '2.1rem', margin: 0 }}>天賦總覽</h2>
+                <h2 style={{ fontSize: isMobile ? '1.45rem' : '2.1rem', margin: 0 }}>主選單天賦樹</h2>
                 <div style={{ display: 'flex', gap: isMobile ? '12px' : '22px', alignItems: 'center', flexWrap: 'wrap', fontSize: isMobile ? '1rem' : '1.3rem', background: '#2a2a2a', border: '1px solid #444', borderRadius: '10px', padding: isMobile ? '10px 14px' : '14px 22px', justifyContent: 'center', width: 'min(980px, 96vw)' }}>
                     <span title={RESOURCE_LABELS[RESOURCES.ENERGY]} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ResourceIcon type={RESOURCES.ENERGY} size={isMobile ? 18 : 22} /> {resources.energy}</span>
                     <span title={RESOURCE_LABELS[RESOURCES.RED_CRYSTAL]} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ResourceIcon type={RESOURCES.RED_CRYSTAL} size={isMobile ? 18 : 22} /> {resources.red_crystal || 0}</span>
@@ -268,7 +271,7 @@ const TalentTree = ({ onBack }) => {
             )}
 
             {isMobile && (
-                <div style={{ flex: 1, overflow: 'hidden' }}>
+                <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
                     {TALENT_CATEGORIES.filter((c) => c.id === activeCategoryId).map((category) => (
                         <TalentSection
                             key={category.id}
