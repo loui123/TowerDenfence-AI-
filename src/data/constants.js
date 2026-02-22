@@ -63,6 +63,7 @@ export const TALENTS = {
   INITIAL_GOLD: { id: 'initial_gold', name: '初始金幣', costType: RESOURCES.ENERGY, baseCost: 10, perLevel: 50 },
   PLAYER_MAX_HP: { id: 'player_max_hp', name: '提升玩家最大生命', costType: RESOURCES.ENERGY, baseCost: 25, perLevel: 1 },
   ITEM_DROP_RATE: { id: 'item_drop_rate', name: '增加道具掉落機率', costType: RESOURCES.ENERGY, baseCost: 25, perLevel: 0.1 },
+  TOWER_LIMIT: { id: 'tower_limit', name: '增加可建塔上限', costType: RESOURCES.ENERGY, baseCost: 30, perLevel: 1 },
   MOB_HP_DROP: { id: 'mob_hp_drop', name: '增加怪物血量與資源掉落', costType: RESOURCES.GOLD_ORE, baseCost: 10, perLevel: 0.3, dropPerLevel: 0.1 },
   MOB_DENSITY: { id: 'mob_density', name: '增加怪物密集度', costType: RESOURCES.GOLD_ORE, baseCost: 20, perLevel: 1 },
 

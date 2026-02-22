@@ -20,7 +20,7 @@ const RESOURCE_LABELS = {
 };
 
 const TALENT_CATEGORIES = [
-    { id: 'level_config', title: '關卡設定', talentIds: ['initial_gold', 'player_max_hp', 'item_drop_rate', 'mob_hp_drop', 'mob_density'] },
+    { id: 'level_config', title: '關卡設定', talentIds: ['initial_gold', 'player_max_hp', 'item_drop_rate', 'tower_limit', 'mob_hp_drop', 'mob_density'] },
     {
         id: 'melee',
         title: '近戰塔特性',
@@ -46,6 +46,7 @@ const formatTalentEffect = (talentId, perLevel) => {
     if (talentId.endsWith('_range')) return `每級 +${perLevel} 格`;
     if (talentId === 'initial_gold') return `每級 +${perLevel} 金幣`;
     if (talentId === 'player_max_hp') return `每級 +${perLevel} 最大生命`;
+    if (talentId === 'tower_limit') return `每級 +${perLevel} 可建塔上限`;
     if (talentId === 'mob_hp_drop') return '每級 +30% 怪物血量、+10% 資源掉落';
     if (talentId === 'mob_density') return '每級怪物密度 x2（同波時長）';
     if (talentId === 'item_drop_rate') return `每級 +${Math.floor(perLevel * 100)}% 道具掉落率`;
@@ -204,28 +205,28 @@ const TalentTree = ({ onBack }) => {
 
     return (
         <div style={{
-            padding: isMobile ? '8px' : '12px',
+            padding: isMobile ? '10px' : '16px',
             height: '100%',
-            width: 'min(1500px, 100vw)',
+            width: 'min(1700px, 100vw)',
             maxWidth: '100%',
             boxSizing: 'border-box',
             display: 'flex',
             flexDirection: 'column',
-            gap: '10px',
+            gap: '14px',
             overflow: 'hidden'
         }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: '12px', flexDirection: isMobile ? 'column' : 'row' }}>
-                <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', justifyItems: 'center', gap: '10px' }}>
+                <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '5px', justifySelf: 'start' }}>
                     <ArrowLeft size={16} />
                     返回
                 </button>
-                <h2 style={{ fontSize: isMobile ? '1.05rem' : '1.5rem', margin: 0 }}>天賦總覽</h2>
-                <div style={{ display: 'flex', gap: isMobile ? '8px' : '12px', alignItems: 'center', flexWrap: 'wrap', fontSize: isMobile ? '0.85rem' : '1rem' }}>
-                    <span title={RESOURCE_LABELS[RESOURCES.ENERGY]}><ResourceIcon type={RESOURCES.ENERGY} /> {resources.energy}</span>
-                    <span title={RESOURCE_LABELS[RESOURCES.RED_CRYSTAL]}><ResourceIcon type={RESOURCES.RED_CRYSTAL} /> {resources.red_crystal || 0}</span>
-                    <span title={RESOURCE_LABELS[RESOURCES.GREEN_GEM]}><ResourceIcon type={RESOURCES.GREEN_GEM} /> {resources.green_gem || 0}</span>
-                    <span title={RESOURCE_LABELS[RESOURCES.BLUE_CRYSTAL]}><ResourceIcon type={RESOURCES.BLUE_CRYSTAL} /> {resources.blue_crystal || 0}</span>
-                    <span title={RESOURCE_LABELS[RESOURCES.GOLD_ORE]}><ResourceIcon type={RESOURCES.GOLD_ORE} /> {resources.gold_ore || 0}</span>
+                <h2 style={{ fontSize: isMobile ? '1.45rem' : '2.1rem', margin: 0 }}>天賦總覽</h2>
+                <div style={{ display: 'flex', gap: isMobile ? '12px' : '22px', alignItems: 'center', flexWrap: 'wrap', fontSize: isMobile ? '1rem' : '1.3rem', background: '#2a2a2a', border: '1px solid #444', borderRadius: '10px', padding: isMobile ? '10px 14px' : '14px 22px', justifyContent: 'center', width: 'min(980px, 96vw)' }}>
+                    <span title={RESOURCE_LABELS[RESOURCES.ENERGY]} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ResourceIcon type={RESOURCES.ENERGY} size={isMobile ? 18 : 22} /> {resources.energy}</span>
+                    <span title={RESOURCE_LABELS[RESOURCES.RED_CRYSTAL]} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ResourceIcon type={RESOURCES.RED_CRYSTAL} size={isMobile ? 18 : 22} /> {resources.red_crystal || 0}</span>
+                    <span title={RESOURCE_LABELS[RESOURCES.GREEN_GEM]} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ResourceIcon type={RESOURCES.GREEN_GEM} size={isMobile ? 18 : 22} /> {resources.green_gem || 0}</span>
+                    <span title={RESOURCE_LABELS[RESOURCES.BLUE_CRYSTAL]} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ResourceIcon type={RESOURCES.BLUE_CRYSTAL} size={isMobile ? 18 : 22} /> {resources.blue_crystal || 0}</span>
+                    <span title={RESOURCE_LABELS[RESOURCES.GOLD_ORE]} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><ResourceIcon type={RESOURCES.GOLD_ORE} size={isMobile ? 18 : 22} /> {resources.gold_ore || 0}</span>
                 </div>
             </div>
 

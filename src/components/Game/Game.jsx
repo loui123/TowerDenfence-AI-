@@ -112,12 +112,12 @@ const TERRAIN_META = {
     },
     swamp: {
         name: '沼澤',
-        description: '近戰塔攻速 -20%，路徑怪物移速 -30%',
+        description: '緩速塔緩速效果 +20%，近戰塔攻速 -20%，路徑怪物移速 -30%',
         image: 'repeating-radial-gradient(circle at 25% 35%, rgba(70,100,60,0.24) 0 10px, rgba(50,70,40,0.1) 10px 18px)'
     },
     desert: {
         name: '沙地',
-        description: '無額外效果',
+        description: '塔攻速 -10%，塔傷害 +20%',
         image: 'linear-gradient(140deg, rgba(220,190,120,0.2), rgba(170,140,85,0.12))'
     },
     rocky: {
@@ -281,7 +281,7 @@ const UPDATE_LOG_ITEMS = [
 ];
 
 const Game = ({ onExit }) => {
-    const { talents, resources, addResource } = useGame();
+    const { talents, resources, addResource, recordRunSession } = useGame();
     const canvasRef = useRef(null);
     const engineRef = useRef(null);
     const visualsRef = useRef({});
@@ -296,6 +296,8 @@ const Game = ({ onExit }) => {
     const bgmNextTimeRef = useRef(0);
     const sfxEnabledRef = useRef(true);
     const combatSfxCooldownRef = useRef({ attack: 0, explosion: 0 });
+    const sessionStartRef = useRef(Date.now());
+    const exitHandledRef = useRef(false);
 
     const [mapData] = useState(() => generateMap(15, 15));
     const [grid, setGrid] = useState(mapData.grid);
@@ -339,6 +341,27 @@ const Game = ({ onExit }) => {
     const [sfxEnabled, setSfxEnabled] = useState(true);
 
     const isInteractionModalOpen = !!buildTarget || !!upgradeTarget;
+
+    const handleExitWithRecord = () => {
+        if (exitHandledRef.current) return;
+        exitHandledRef.current = true;
+
+        const engine = engineRef.current;
+        const towers = engine?.towers || [];
+        const mvp = towers.length
+            ? [...towers].sort((a, b) => (b.totalDamageDealt || 0) - (a.totalDamageDealt || 0))[0]
+            : null;
+
+        recordRunSession?.({
+            highestWave: Math.max(1, Math.floor(engine?.wave || gameState.wave || 1)),
+            durationSec: Math.floor((Date.now() - sessionStartRef.current) / 1000),
+            playedAt: new Date().toISOString(),
+            mvpTowerName: mvp ? getTowerName(mvp.type) : '無',
+            mvpTowerDamage: Math.floor(mvp?.totalDamageDealt || 0)
+        });
+
+        onExit();
+    };
 
     useEffect(() => {
         autoNextWaveRef.current = autoNextWave;
@@ -582,7 +605,7 @@ const Game = ({ onExit }) => {
                 const continuePlay = window.confirm('已完成第10關，獲得 1 藍水晶。按「確定」繼續遊玩（後續不再獲得藍水晶），按「取消」返回主選單。');
                 if (!continuePlay) {
                     engine.stop();
-                    onExit();
+                    handleExitWithRecord();
                     return false;
                 }
 
@@ -915,6 +938,10 @@ const Game = ({ onExit }) => {
             if (option.onlyProjectile && !isProjectileTower(tower)) return false;
             if (option.onlySlowTower && !isSlowTower(tower)) return false;
             if (option.onlyArtillery && !isArtilleryTower(tower)) return false;
+            if (
+                (option.id === 'poison_dmg' || option.id === 'poison_duration' || option.id === 'poison_frequency')
+                && (tower.upgradeStats?.wood_dmg || 0) <= 0
+            ) return false;
             if (option.id === 'crit_chance' && (tower.stats?.crit || 0) >= 1) return false;
             if (option.maxCount && (tower.upgradeStats?.[option.id] || 0) >= option.maxCount) return false;
             if (option.magicElement && tower.magicElement && tower.magicElement !== option.magicElement) return false;
@@ -1101,6 +1128,12 @@ const Game = ({ onExit }) => {
         const placedTower = engineRef.current.placeTower(buildTarget.x, buildTarget.y, towerTypeId);
         if (!placedTower) {
             triggerSfx('error');
+            const reason = engineRef.current.getLastPlaceTowerError?.();
+            if (reason === 'tower_limit') {
+                appendConsoleLog(`塔數已達上限 (${engineRef.current.towers.length}/${engineRef.current.getTowerLimit?.() || 5})`);
+            } else if (reason === 'insufficient_gold') {
+                appendConsoleLog('金錢不足');
+            }
             return;
         }
 
@@ -1231,16 +1264,26 @@ const Game = ({ onExit }) => {
         const extraRange = currentRange - initialRange;
 
         const specRows = selectedTower.specializationId
-            ? [{ key: selectedTower.specializationId, label: SPECIALIZATION_LABEL_MAP[selectedTower.specializationId] || selectedTower.specializationId, isSpec: true }]
+            ? [{
+                key: selectedTower.specializationId,
+                label: SPECIALIZATION_LABEL_MAP[selectedTower.specializationId] || selectedTower.specializationId,
+                isSpec: true
+            }]
             : [];
         const upgradeRows = Object.entries(selectedTower.upgradeStats || {})
             .filter(([, lv]) => lv > 0)
-            .map(([id, lv]) => ({
-                key: id,
-                label: UPGRADE_LABEL_MAP[id] || id,
-                level: lv,
-                isSpec: false
-            }))
+            .map(([id, lv]) => {
+                const option = UPGRADE_OPTION_MAP[id] || null;
+                const maxCount = option?.maxCount ?? null;
+                return {
+                    key: id,
+                    label: UPGRADE_LABEL_MAP[id] || id,
+                    level: lv,
+                    maxCount,
+                    isMax: maxCount !== null && lv >= maxCount,
+                    isSpec: false
+                };
+            })
             .sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
 
         return {
@@ -1288,14 +1331,17 @@ const Game = ({ onExit }) => {
     const towerRankRows = [...towerRows]
         .sort((a, b) => (b.damage - a.damage) || (b.kills - a.kills))
         .slice(0, 10);
+    const towerLimit = engine?.getTowerLimit?.() || 5;
+    const towerCount = towerRows.length;
 
     const waveInfo = engine
         ? (() => {
             const cfg = engine.getWaveConfig(gameState.wave);
             const density = engine.getMobDensityMultiplier();
-            const hp = 10 * gameState.wave * engine.getMobHpMultiplier() * engine.getWaveHpScale(gameState.wave);
             const affixes = engine.getWaveAffixes ? engine.getWaveAffixes(gameState.wave) : [];
             const speedUp = affixes.find((a) => a.id === 'move_speed_up')?.value || 0;
+            const hpUp = affixes.find((a) => a.id === 'hp_percent_up')?.value || 0;
+            const hp = 10 * gameState.wave * engine.getMobHpMultiplier() * engine.getWaveHpScale(gameState.wave) * (1 + hpUp);
             return {
                 type: cfg.type,
                 spawnTarget: Math.max(1, Math.floor(cfg.count * density)),
@@ -1316,9 +1362,10 @@ const Game = ({ onExit }) => {
             const nextWave = gameState.wave + 1;
             const cfg = engine.getWaveConfig(nextWave);
             const density = engine.getMobDensityMultiplier();
-            const hp = 10 * nextWave * engine.getMobHpMultiplier() * engine.getWaveHpScale(nextWave);
             const affixes = engine.getWaveAffixes ? engine.getWaveAffixes(nextWave) : [];
             const speedUp = affixes.find((a) => a.id === 'move_speed_up')?.value || 0;
+            const hpUp = affixes.find((a) => a.id === 'hp_percent_up')?.value || 0;
+            const hp = 10 * nextWave * engine.getMobHpMultiplier() * engine.getWaveHpScale(nextWave) * (1 + hpUp);
             return {
                 wave: nextWave,
                 type: cfg.type,
@@ -1415,6 +1462,7 @@ const Game = ({ onExit }) => {
                     <span style={{ color: 'red', display: 'flex', alignItems: 'center', gap: '5px' }}><Heart size={16} /> {gameState.hp}/{gameState.maxHp}</span>
                     <span style={{ color: '#aaa' }}>波數: {gameState.wave}</span>
                     <span>怪物: {gameState.mobsCount}</span>
+                    <span style={{ color: '#b9d4ff' }}>塔數: {towerCount}/{towerLimit}</span>
                     <span style={{ color: '#8ec5ff', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                         速度 x{gameState.gameSpeed.toFixed(2)}
                         <button
@@ -1481,7 +1529,7 @@ const Game = ({ onExit }) => {
                     >
                         音效 {sfxEnabled ? '開' : '關'}
                     </button>
-                    <button onClick={onExit}>離開</button>
+                    <button onClick={handleExitWithRecord}>離開</button>
                 </div>
             </div>
 
@@ -1546,7 +1594,7 @@ const Game = ({ onExit }) => {
                                     ) : (
                                         selectedTowerDetail.talentRows.map((row) => (
                                             <div key={row.key} style={{ color: row.isSpec ? '#c0c0c0' : '#d7d7d7' }}>
-                                                {row.label} {row.isSpec ? '' : `LV${row.level}`}
+                                                {row.label} {row.isSpec ? '專精' : (row.isMax ? 'LVMax' : `LV${row.level}`)}
                                             </div>
                                         ))
                                     )}
@@ -1750,7 +1798,7 @@ const Game = ({ onExit }) => {
                             gap: '10px'
                         }}>
                             <h1>遊戲結束</h1>
-                            <button onClick={onExit}>回主選單</button>
+                            <button onClick={handleExitWithRecord}>回主選單</button>
                         </div>
                     )}
 

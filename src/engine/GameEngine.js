@@ -50,6 +50,7 @@ export class GameEngine {
             critDmgAura: false
         };
         this.waveAffixCache = {};
+        this.lastPlaceTowerError = null;
 
         console.log("GameEngine Initialized", { pathLength: path?.length, wave: this.wave });
     }
@@ -90,6 +91,14 @@ export class GameEngine {
                 desc: `暈眩持續時間減少 ${(reduction * 100).toFixed(0)}%`
             };
         }
+        if (id === 'palsy_resist_cap') {
+            return {
+                id,
+                name: '麻痺效果硬質',
+                value: 0.1,
+                desc: '每一秒最多承受 0.1 秒麻痺'
+            };
+        }
         if (id === 'crit_damage_reduction') {
             const reduction = this.lerpByWave(wave, 1.0, 2.0);
             return {
@@ -113,23 +122,63 @@ export class GameEngine {
                 desc: `怪物移動速度增加 ${(speedUp * 100).toFixed(0)}%`
             };
         }
+        if (id === 'hp_percent_up') {
+            const hpUp = this.lerpByWave(wave, 0.4, 0.8);
+            return {
+                id,
+                name: '增加怪物生命%數',
+                value: hpUp,
+                desc: `怪物生命增加 ${(hpUp * 100).toFixed(0)}%`
+            };
+        }
         return null;
+    }
+
+    getWaveAffixWeights() {
+        return {
+            slow_resist_cap: 5,
+            stun_hardness: 5,
+            stun_duration_reduction: 5,
+            palsy_resist_cap: 5,
+            crit_damage_reduction: 5,
+            melee_dmg_reduction: 10,
+            bleed_dmg_reduction: 10,
+            poison_dmg_reduction: 10,
+            projectile_dmg_reduction: 10,
+            elemental_dmg_reduction: 10,
+            move_speed_up: 30,
+            hp_percent_up: 70
+        };
+    }
+
+    pickWeightedAffixIds(count, wave) {
+        const weights = this.getWaveAffixWeights();
+        const entries = Object.entries(weights)
+            .filter(([, weight]) => weight > 0)
+            .filter(([id]) => !!this.buildAffixById(id, wave))
+            .map(([id, weight]) => ({ id, weight }));
+
+        const picks = [];
+        while (picks.length < count && entries.length > 0) {
+            const totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
+            let roll = Math.random() * totalWeight;
+            let index = 0;
+            for (let i = 0; i < entries.length; i++) {
+                roll -= entries[i].weight;
+                if (roll <= 0) {
+                    index = i;
+                    break;
+                }
+            }
+            picks.push(entries[index].id);
+            entries.splice(index, 1);
+        }
+
+        return picks;
     }
 
     rollWaveAffixes(wave) {
         if (wave <= 10) return [];
-        const pool = [
-            'slow_resist_cap',
-            'stun_hardness',
-            'stun_duration_reduction',
-            'crit_damage_reduction',
-            'melee_dmg_reduction',
-            'bleed_dmg_reduction',
-            'poison_dmg_reduction',
-            'projectile_dmg_reduction',
-            'elemental_dmg_reduction',
-            'move_speed_up'
-        ];
 
         const affixCount = (() => {
             if (wave >= 50) {
@@ -142,8 +191,8 @@ export class GameEngine {
         })();
 
         if (affixCount <= 0) return [];
-        const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(pool.length, affixCount));
-        return shuffled.map((id) => this.buildAffixById(id, wave)).filter(Boolean);
+        const pickedIds = this.pickWeightedAffixIds(affixCount, wave);
+        return pickedIds.map((id) => this.buildAffixById(id, wave)).filter(Boolean);
     }
 
     getWaveAffixes(wave) {
@@ -373,19 +422,22 @@ export class GameEngine {
         const waveAffixes = this.getWaveAffixes(this.wave);
         const waveAffixMap = this.getWaveAffixMap(this.wave);
         const moveSpeedUp = waveAffixMap.move_speed_up || 0;
+        const hpPercentUp = waveAffixMap.hp_percent_up || 0;
+        const hpMult = 1 + hpPercentUp;
 
         const newMob = {
             id: Math.random(),
             type: typeId,
             isBoss,
-            hp: 10 * this.wave * buff * this.getWaveHpScale(this.wave) * bossHpMultiplier,
-            maxHp: 10 * this.wave * buff * this.getWaveHpScale(this.wave) * bossHpMultiplier,
+            hp: 10 * this.wave * buff * this.getWaveHpScale(this.wave) * bossHpMultiplier * hpMult,
+            maxHp: 10 * this.wave * buff * this.getWaveHpScale(this.wave) * bossHpMultiplier * hpMult,
             speed: 2 * bossSpeedMultiplier * (1 + moveSpeedUp),
             slowTimer: 0,
             slowMultiplier: 1,
             stunTimer: 0,
             stunHardnessWindow: 0,
             stunHardnessApplied: 0,
+            palsyHardnessApplied: 0,
             pathIndex: 0,
             progress: 0,
             x: this.path[0].x,
@@ -421,6 +473,7 @@ export class GameEngine {
             if (mob.stunHardnessWindow <= 0) {
                 mob.stunHardnessWindow = 1;
                 mob.stunHardnessApplied = 0;
+                mob.palsyHardnessApplied = 0;
             }
 
             const waterSlowMult = 1 - (0.2 * Math.min(5, mob.magicWaterSlowStacks || 0));
@@ -1085,76 +1138,90 @@ export class GameEngine {
     placeTower(x, y, typeId) {
         const typeDef = Object.values(TOWER_TYPES).find(t => t.id === typeId);
         const cell = this.grid[y]?.[x];
+        this.lastPlaceTowerError = null;
 
-        if (cell?.type !== 'build' || this.gold < typeDef.cost) {
+        if (!typeDef) {
+            this.lastPlaceTowerError = 'invalid_type';
             return null;
         }
 
-        if (this.gold >= typeDef.cost) {
-            this.gold -= typeDef.cost;
-            this.grid[y][x].type = 'tower';
-
-            const stats = this.getTowerStats(typeId);
-            const tower = {
-                id: Math.random(),
-                x: x + 0.5,
-                y: y + 0.5,
-                type: typeId,
-                stats: stats,
-                kills: 0,
-                cooldown: 0,
-                level: 1,
-                pendingUpgrades: 0,
-                lockedElement: null,
-                terrain: cell.terrain || null,
-                bonusChain: 0,
-                bonusTargets: 0,
-                bleedLevel: 0,
-                bleedDamageMult: 1,
-                bleedDurationOverride: 0,
-                slowPowerLevel: 0,
-                poisonDamageLevel: 0,
-                poisonDurationLevel: 0,
-                poisonFrequencyLevel: 0,
-                upgradeStats: {},
-                pendingSpecialization: false,
-                specializationChosen: false,
-                masterySpeedMult: 1,
-                redistributeKillExp: false,
-                randomCritBonus: false,
-                hitStun: 0,
-                localFireExplosion: false,
-                disableAttributes: false,
-                chainNoLimit: false,
-                additionalAttackCount: 0,
-                knockbackBonus: 0,
-                knockbackStun: 0,
-                knockbackRadiusBonus: 0,
-                speedMagicApplied: false,
-                speedMagicLevel: 0,
-                triggerMagicLevel: 0,
-                magicElement: null,
-                magicElementLevel: 0,
-                specializationId: null,
-                totalDamageDealt: 0,
-                equipmentId: null,
-                equipmentName: null,
-                supportExp: 0,
-                supportAuraType: typeId === 'support' ? 'attack' : null,
-                supportAttackAuraLevel: 0,
-                supportSpeedAuraLevel: 0,
-                supportSlowAuraLevel: 0,
-                supportCritAuraLevel: 0,
-                supportAuraRangeBonus: 0,
-                supportAuraDouble: false,
-                supportLuckyAura: false,
-                supportLuckyAuraTimer: 0,
-                supportLuckyCritDmgBonus: 0
-            };
-            this.towers.push(tower);
-            return tower;
+        if (cell?.type !== 'build') {
+            this.lastPlaceTowerError = 'invalid_cell';
+            return null;
         }
-        return null;
+
+        if (this.towers.length >= this.getTowerLimit()) {
+            this.lastPlaceTowerError = 'tower_limit';
+            return null;
+        }
+
+        if (this.gold < typeDef.cost) {
+            this.lastPlaceTowerError = 'insufficient_gold';
+            return null;
+        }
+
+        this.gold -= typeDef.cost;
+        this.grid[y][x].type = 'tower';
+
+        const stats = this.getTowerStats(typeId);
+        const tower = {
+            id: Math.random(),
+            x: x + 0.5,
+            y: y + 0.5,
+            type: typeId,
+            stats: stats,
+            kills: 0,
+            cooldown: 0,
+            level: 1,
+            pendingUpgrades: 0,
+            lockedElement: null,
+            terrain: cell.terrain || null,
+            bonusChain: 0,
+            bonusTargets: 0,
+            bleedLevel: 0,
+            bleedDamageMult: 1,
+            bleedDurationOverride: 0,
+            slowPowerLevel: 0,
+            poisonDamageLevel: 0,
+            poisonDurationLevel: 0,
+            poisonFrequencyLevel: 0,
+            upgradeStats: {},
+            pendingSpecialization: false,
+            specializationChosen: false,
+            masterySpeedMult: 1,
+            redistributeKillExp: false,
+            randomCritBonus: false,
+            hitStun: 0,
+            localFireExplosion: false,
+            disableAttributes: false,
+            chainNoLimit: false,
+            additionalAttackCount: 0,
+            knockbackBonus: 0,
+            knockbackStun: 0,
+            knockbackRadiusBonus: 0,
+            speedMagicApplied: false,
+            speedMagicLevel: 0,
+            triggerMagicLevel: 0,
+            magicElement: null,
+            magicElementLevel: 0,
+            specializationId: null,
+            totalDamageDealt: 0,
+            equipmentId: null,
+            equipmentName: null,
+            supportExp: 0,
+            supportAuraType: typeId === 'support' ? 'attack' : null,
+            supportAttackAuraLevel: 0,
+            supportSpeedAuraLevel: 0,
+            supportSlowAuraLevel: 0,
+            supportCritAuraLevel: 0,
+            supportAuraRangeBonus: 0,
+            supportAuraDouble: false,
+            supportLuckyAura: false,
+            supportLuckyAuraTimer: 0,
+            supportLuckyCritDmgBonus: 0
+        };
+        this.towers.push(tower);
+        return tower;
     }
 
     getMobHpMultiplier() {
@@ -1174,6 +1241,14 @@ export class GameEngine {
 
     getGameSpeedMultiplier() {
         return this.userGameSpeed;
+    }
+
+    getTowerLimit() {
+        return 5 + Math.max(0, Math.floor(this.getTalentValue('tower_limit')));
+    }
+
+    getLastPlaceTowerError() {
+        return this.lastPlaceTowerError;
     }
 
     getMaxGameSpeedMultiplier() {
@@ -1265,6 +1340,7 @@ export class GameEngine {
         const mods = {
             damageMult: 1,
             speedMult: 1,
+            slowEffectMult: 1,
             critBonus: 0,
             missChance: 0
         };
@@ -1284,6 +1360,15 @@ export class GameEngine {
 
         if (terrain === 'swamp' && this.isMeleeTower(tower)) {
             mods.speedMult *= 0.8;
+        }
+
+        if (terrain === 'swamp' && tower?.type === 'projectile_slow') {
+            mods.slowEffectMult *= 1.2;
+        }
+
+        if (terrain === 'desert') {
+            mods.speedMult *= 0.9;
+            mods.damageMult *= 1.2;
         }
 
         if (terrain === 'ruins' && tower?.type === 'magic') {
@@ -1343,7 +1428,7 @@ export class GameEngine {
         return Math.max(0.05, mult);
     }
 
-    applyStun(mob, durationSec) {
+    applyStun(mob, durationSec, effectType = 'stun') {
         if (!mob || durationSec <= 0) return;
         let duration = durationSec;
 
@@ -1351,7 +1436,14 @@ export class GameEngine {
         duration *= Math.max(0, 1 - stunReduction);
         if (duration <= 0) return;
 
-        if ((mob.affixMap?.stun_hardness || 0) > 0) {
+        if (effectType === 'palsy') {
+            if ((mob.affixMap?.palsy_resist_cap || 0) > 0) {
+                const remaining = Math.max(0, 0.1 - (mob.palsyHardnessApplied || 0));
+                if (remaining <= 0) return;
+                duration = Math.min(duration, remaining);
+                mob.palsyHardnessApplied = (mob.palsyHardnessApplied || 0) + duration;
+            }
+        } else if ((mob.affixMap?.stun_hardness || 0) > 0) {
             const remaining = Math.max(0, 0.5 - (mob.stunHardnessApplied || 0));
             if (remaining <= 0) return;
             duration = Math.min(duration, remaining);
@@ -1444,7 +1536,7 @@ export class GameEngine {
                 this.addEffect(currentTarget.x + 0.5, currentTarget.y + 0.5, 'hit', { life: 0.12, maxLife: 0.12 });
                 this.damageMob(currentTarget, { base: damage, fire: 0, water: 0, wood: 0 }, sourceTower, false);
                 if (this.mobs.includes(currentTarget) && Math.random() < paralyzeChance) {
-                    this.applyStun(currentTarget, paralyzeSec);
+                    this.applyStun(currentTarget, paralyzeSec, 'palsy');
                 }
             }
 
@@ -1752,7 +1844,9 @@ export class GameEngine {
     applySlowArea(primaryTarget, sourceTower) {
         const radius = 2;
         const radiusSq = radius * radius;
-        const slowPct = Math.min(0.95, 0.3 + ((sourceTower.slowPowerLevel || 0) * 0.1));
+        const terrainMods = this.getTowerTerrainModifiers(sourceTower);
+        const baseSlowPct = 0.3 + ((sourceTower.slowPowerLevel || 0) * 0.1);
+        const slowPct = Math.min(0.95, baseSlowPct * (terrainMods.slowEffectMult || 1));
         const slowMult = 1 - slowPct;
 
         for (const mob of this.mobs) {

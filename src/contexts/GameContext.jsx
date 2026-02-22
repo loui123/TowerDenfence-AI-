@@ -12,7 +12,11 @@ const INITIAL_STATE = {
         [RESOURCES.BLUE_CRYSTAL]: 0,
         [RESOURCES.GOLD_ORE]: 0,
     },
-    talents: {} // id: level
+    talents: {}, // id: level
+    runStats: {
+        bestRun: null,
+        recentRuns: []
+    }
 };
 
 export const GameProvider = ({ children }) => {
@@ -26,6 +30,11 @@ export const GameProvider = ({ children }) => {
                 resources: {
                     ...INITIAL_STATE.resources,
                     ...(parsed?.resources || {})
+                },
+                runStats: {
+                    ...INITIAL_STATE.runStats,
+                    ...(parsed?.runStats || {}),
+                    recentRuns: Array.isArray(parsed?.runStats?.recentRuns) ? parsed.runStats.recentRuns : []
                 }
             };
         } catch {
@@ -133,6 +142,35 @@ export const GameProvider = ({ children }) => {
 
     const getTalentLevel = (talentId) => saveData.talents[talentId] || 0;
 
+    const recordRunSession = (runSummary) => {
+        if (!runSummary) return;
+        const normalized = {
+            highestWave: Math.max(1, Math.floor(runSummary.highestWave || 1)),
+            durationSec: Math.max(0, Math.floor(runSummary.durationSec || 0)),
+            playedAt: runSummary.playedAt || new Date().toISOString(),
+            mvpTowerName: runSummary.mvpTowerName || '無',
+            mvpTowerDamage: Math.max(0, Math.floor(runSummary.mvpTowerDamage || 0))
+        };
+
+        setSaveData((prev) => {
+            const prevStats = prev.runStats || { bestRun: null, recentRuns: [] };
+            const nextRecentRuns = [normalized, ...(prevStats.recentRuns || [])].slice(0, 20);
+            const prevBest = prevStats.bestRun || null;
+            const shouldReplaceBest = !prevBest
+                || normalized.highestWave > prevBest.highestWave
+                || (normalized.highestWave === prevBest.highestWave && normalized.durationSec > (prevBest.durationSec || 0));
+            const nextBestRun = shouldReplaceBest ? normalized : prevBest;
+
+            return {
+                ...prev,
+                runStats: {
+                    bestRun: nextBestRun,
+                    recentRuns: nextRecentRuns
+                }
+            };
+        });
+    };
+
     // Cheat function for debug
     const debugAddResources = () => {
         setSaveData(prev => ({
@@ -155,6 +193,7 @@ export const GameProvider = ({ children }) => {
         <GameContext.Provider value={{
             resources: saveData.resources,
             talents: saveData.talents,
+            runStats: saveData.runStats || { bestRun: null, recentRuns: [] },
             addResource,
             upgradeTalent,
             getTalentCost,
@@ -163,6 +202,7 @@ export const GameProvider = ({ children }) => {
             canRefundTalent,
             getTalentLevel,
             refundTalent,
+            recordRunSession,
             debugAddResources,
             resetSave
         }}>
