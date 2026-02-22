@@ -4,7 +4,7 @@ import { Play, Zap, Gem, Pickaxe } from 'lucide-react';
 import TalentTree from './TalentTree';
 
 const MainMenu = ({ onStart }) => {
-    const { resources, runStats, debugAddResources, resetSave } = useGame();
+    const { resources, settings, updateSettings, runStats, debugAddResources, resetSave } = useGame();
     const [view, setView] = React.useState('main'); // main, talents
     const bestRun = runStats?.bestRun || null;
     const recentRuns = runStats?.recentRuns || [];
@@ -49,6 +49,31 @@ const MainMenu = ({ onStart }) => {
                 <button onClick={() => setView('talents')} style={{ fontSize: '1.35rem', padding: '14px 18px', fontWeight: 700 }}>
                     開啟天賦樹
                 </button>
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                    <button
+                        onClick={() => updateSettings({ bgmEnabled: !settings?.bgmEnabled })}
+                        style={{
+                            fontSize: '1rem',
+                            padding: '10px 14px',
+                            border: `1px solid ${settings?.bgmEnabled ? '#6ad58a' : '#555'}`,
+                            background: settings?.bgmEnabled ? '#264b2f' : '#2a2a2a'
+                        }}
+                    >
+                        BGM {settings?.bgmEnabled ? '開' : '關'}
+                    </button>
+                    <button
+                        onClick={() => updateSettings({ sfxEnabled: !settings?.sfxEnabled })}
+                        style={{
+                            fontSize: '1rem',
+                            padding: '10px 14px',
+                            border: `1px solid ${settings?.sfxEnabled ? '#79b8ff' : '#555'}`,
+                            background: settings?.sfxEnabled ? '#2b374a' : '#2a2a2a'
+                        }}
+                    >
+                        音效 {settings?.sfxEnabled ? '開' : '關'}
+                    </button>
+                </div>
 
                 <div style={{ marginTop: '8px', borderTop: '1px solid #444', paddingTop: '10px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
                     <button onClick={debugAddResources} style={{ fontSize: '0.9rem' }}>測試：新增資源</button>

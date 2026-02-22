@@ -13,6 +13,10 @@ const INITIAL_STATE = {
         [RESOURCES.GOLD_ORE]: 0,
     },
     talents: {}, // id: level
+    settings: {
+        bgmEnabled: true,
+        sfxEnabled: true
+    },
     runStats: {
         bestRun: null,
         recentRuns: []
@@ -35,6 +39,10 @@ export const GameProvider = ({ children }) => {
                     ...INITIAL_STATE.runStats,
                     ...(parsed?.runStats || {}),
                     recentRuns: Array.isArray(parsed?.runStats?.recentRuns) ? parsed.runStats.recentRuns : []
+                },
+                settings: {
+                    ...INITIAL_STATE.settings,
+                    ...(parsed?.settings || {})
                 }
             };
         } catch {
@@ -142,6 +150,16 @@ export const GameProvider = ({ children }) => {
 
     const getTalentLevel = (talentId) => saveData.talents[talentId] || 0;
 
+    const updateSettings = (nextSettings) => {
+        setSaveData((prev) => ({
+            ...prev,
+            settings: {
+                ...prev.settings,
+                ...(nextSettings || {})
+            }
+        }));
+    };
+
     const recordRunSession = (runSummary) => {
         if (!runSummary) return;
         const normalized = {
@@ -193,6 +211,7 @@ export const GameProvider = ({ children }) => {
         <GameContext.Provider value={{
             resources: saveData.resources,
             talents: saveData.talents,
+            settings: saveData.settings || INITIAL_STATE.settings,
             runStats: saveData.runStats || { bestRun: null, recentRuns: [] },
             addResource,
             upgradeTalent,
@@ -203,6 +222,7 @@ export const GameProvider = ({ children }) => {
             getTalentLevel,
             refundTalent,
             recordRunSession,
+            updateSettings,
             debugAddResources,
             resetSave
         }}>

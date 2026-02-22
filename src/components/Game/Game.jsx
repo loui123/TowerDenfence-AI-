@@ -281,7 +281,7 @@ const UPDATE_LOG_ITEMS = [
 ];
 
 const Game = ({ onExit }) => {
-    const { talents, resources, addResource, recordRunSession } = useGame();
+    const { talents, resources, settings, addResource, recordRunSession } = useGame();
     const canvasRef = useRef(null);
     const engineRef = useRef(null);
     const visualsRef = useRef({});
@@ -335,9 +335,10 @@ const Game = ({ onExit }) => {
         [ITEM_TYPES.EQUIPMENT]: 0
     });
     const [mobileInfoTab, setMobileInfoTab] = useState('wave'); // wave | towers | rank
+    const [mobilePanelTab, setMobilePanelTab] = useState('consumable'); // consumable | equipment | wave | towers | rank
     const [topBarHeight, setTopBarHeight] = useState(70);
-    const [bgmEnabled, setBgmEnabled] = useState(true);
-    const [sfxEnabled, setSfxEnabled] = useState(true);
+    const [bgmEnabled, setBgmEnabled] = useState(settings?.bgmEnabled !== false);
+    const [sfxEnabled, setSfxEnabled] = useState(settings?.sfxEnabled !== false);
 
     const isInteractionModalOpen = !!buildTarget || !!upgradeTarget;
 
@@ -365,6 +366,14 @@ const Game = ({ onExit }) => {
     useEffect(() => {
         autoNextWaveRef.current = autoNextWave;
     }, [autoNextWave]);
+
+    useEffect(() => {
+        const nextBgmEnabled = settings?.bgmEnabled !== false;
+        const nextSfxEnabled = settings?.sfxEnabled !== false;
+        setBgmEnabled(nextBgmEnabled);
+        setSfxEnabled(nextSfxEnabled);
+        sfxEnabledRef.current = nextSfxEnabled;
+    }, [settings?.bgmEnabled, settings?.sfxEnabled]);
 
     useEffect(() => {
         sfxEnabledRef.current = sfxEnabled;
@@ -550,19 +559,6 @@ const Game = ({ onExit }) => {
             stopBgmLoop();
         }
     }, [bgmEnabled]);
-
-    const toggleBgm = () => {
-        ensureAudioContext();
-        setBgmEnabled((prev) => !prev);
-    };
-
-    const toggleSfx = () => {
-        ensureAudioContext();
-        const next = !sfxEnabledRef.current;
-        sfxEnabledRef.current = next;
-        setSfxEnabled(next);
-        if (next) triggerSfx('item');
-    };
 
     useEffect(() => () => {
         stopBgmLoop();
@@ -1408,11 +1404,6 @@ const Game = ({ onExit }) => {
         { key: 'towers', label: '塔資訊' },
         { key: 'rank', label: '排名' }
     ];
-    const mobileInfoIndex = Math.max(0, mobileInfoTabs.findIndex((tab) => tab.key === mobileInfoTab));
-    const cycleMobileInfoTab = (direction) => {
-        const nextIndex = (mobileInfoIndex + direction + mobileInfoTabs.length) % mobileInfoTabs.length;
-        setMobileInfoTab(mobileInfoTabs[nextIndex].key);
-    };
 
     return (
         <div
@@ -1433,91 +1424,74 @@ const Game = ({ onExit }) => {
                 top: 0,
                 left: 0,
                 right: 0,
-                minHeight: '60px',
+                minHeight: '54px',
                 background: '#222',
                 display: 'flex',
-                flexDirection: isMobile ? 'column' : 'row',
-                alignItems: isMobile ? 'stretch' : 'center',
-                justifyContent: 'space-between',
-                padding: isMobile ? '8px 10px' : '0 20px',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                padding: isMobile ? '6px 10px' : '6px 16px',
                 borderBottom: '1px solid #444',
                 zIndex: 10,
-                gap: isMobile ? '8px' : 0
+                gap: isMobile ? '8px' : '14px',
+                flexWrap: 'nowrap',
+                overflowX: 'auto',
+                whiteSpace: 'nowrap'
             }} ref={topBarRef}>
-                <div style={{ display: 'flex', gap: isMobile ? '10px' : '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ color: 'gold', fontWeight: 'bold' }}>金幣 {Math.floor(gameState.gold)}</span>
-                    <span style={{ color: 'red', display: 'flex', alignItems: 'center', gap: '5px' }}><Heart size={16} /> {gameState.hp}/{gameState.maxHp}</span>
-                    <span style={{ color: '#aaa' }}>波數: {gameState.wave}</span>
-                    <span>怪物: {gameState.mobsCount}</span>
-                    <span style={{ color: '#b9d4ff' }}>塔數: {towerCount}/{towerLimit}</span>
-                    <span style={{ color: '#8ec5ff', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        速度 x{gameState.gameSpeed.toFixed(2)}
-                        <button
-                            onClick={() => changeGameSpeed(-1)}
-                            disabled={gameState.gameSpeed <= 1}
-                            style={{ padding: '1px 6px', lineHeight: 1, opacity: gameState.gameSpeed <= 1 ? 0.45 : 1 }}
-                            title="降低遊戲速度"
-                        >
-                            -
-                        </button>
-                        <button
-                            onClick={() => changeGameSpeed(1)}
-                            disabled={gameState.gameSpeed >= gameState.gameSpeedCap}
-                            style={{ padding: '1px 6px', lineHeight: 1, opacity: gameState.gameSpeed >= gameState.gameSpeedCap ? 0.45 : 1 }}
-                            title="提高遊戲速度"
-                        >
-                            +
-                        </button>
-                        <span style={{ color: '#7aa8d8', fontSize: '0.85em' }}>上限 x{gameState.gameSpeedCap.toFixed(2)}</span>
-                    </span>
-                    <span style={{ color: '#9ee493' }}>能量: {resources.energy || 0}</span>
-                    <span style={{ color: '#ff7f7f' }}>紅水晶: {resources.red_crystal || 0}</span>
-                    <span style={{ color: '#67d39a' }}>綠寶石: {resources.green_gem || 0}</span>
-                    <span style={{ color: '#79b8ff' }}>藍水晶: {resources.blue_crystal || 0}</span>
-                    <span style={{ color: '#f5c451' }}>金礦: {resources.gold_ore || 0}</span>
-
-                    {!gameState.waveActive && !gameOver && (
-                        <button onClick={handleStartWave} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'green', border: 'none' }}>
-                            <Play size={16} fill="white" /> 下一波
-                        </button>
-                    )}
-
+                <span style={{ color: 'gold', fontWeight: 'bold' }}>金幣 {Math.floor(gameState.gold)}</span>
+                <span style={{ color: 'red', display: 'flex', alignItems: 'center', gap: '5px' }}><Heart size={16} /> {gameState.hp}/{gameState.maxHp}</span>
+                <span style={{ color: '#aaa' }}>波數: {gameState.wave}</span>
+                <span>怪物: {gameState.mobsCount}</span>
+                <span style={{ color: '#b9d4ff' }}>塔數: {towerCount}/{towerLimit}</span>
+                <span style={{ color: '#8ec5ff', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    速度 x{gameState.gameSpeed.toFixed(2)}
                     <button
-                        onClick={() => setAutoNextWave((prev) => !prev)}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            background: autoNextWave ? '#0e6b2a' : '#333',
-                            border: `1px solid ${autoNextWave ? '#54d67a' : '#555'}`
-                        }}
+                        onClick={() => changeGameSpeed(-1)}
+                        disabled={gameState.gameSpeed <= 1}
+                        style={{ padding: '1px 6px', lineHeight: 1, opacity: gameState.gameSpeed <= 1 ? 0.45 : 1 }}
+                        title="降低遊戲速度"
                     >
-                        <FastForward size={14} /> 自動跳關: {autoNextWave ? '開' : '關'}
-                    </button>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: isMobile ? 'space-between' : 'flex-end' }}>
-                    <div style={{ color: '#7cff9a', fontWeight: 700 }}>待選升級: {gameState.pendingUpgradePoints}</div>
-                    <button
-                        onClick={toggleBgm}
-                        style={{
-                            background: bgmEnabled ? '#264b2f' : '#2a2a2a',
-                            border: `1px solid ${bgmEnabled ? '#6ad58a' : '#555'}`
-                        }}
-                    >
-                        BGM {bgmEnabled ? '開' : '關'}
+                        -
                     </button>
                     <button
-                        onClick={toggleSfx}
-                        style={{
-                            background: sfxEnabled ? '#2b374a' : '#2a2a2a',
-                            border: `1px solid ${sfxEnabled ? '#79b8ff' : '#555'}`
-                        }}
+                        onClick={() => changeGameSpeed(1)}
+                        disabled={gameState.gameSpeed >= gameState.gameSpeedCap}
+                        style={{ padding: '1px 6px', lineHeight: 1, opacity: gameState.gameSpeed >= gameState.gameSpeedCap ? 0.45 : 1 }}
+                        title="提高遊戲速度"
                     >
-                        音效 {sfxEnabled ? '開' : '關'}
+                        +
                     </button>
-                    <button onClick={handleExitWithRecord}>離開</button>
-                </div>
+                </span>
+                {!isMobile && (
+                    <>
+                        <span style={{ color: '#9ee493' }}>能量: {resources.energy || 0}</span>
+                        <span style={{ color: '#ff7f7f' }}>紅水晶: {resources.red_crystal || 0}</span>
+                        <span style={{ color: '#67d39a' }}>綠寶石: {resources.green_gem || 0}</span>
+                        <span style={{ color: '#79b8ff' }}>藍水晶: {resources.blue_crystal || 0}</span>
+                        <span style={{ color: '#f5c451' }}>金礦: {resources.gold_ore || 0}</span>
+                    </>
+                )}
+
+                {!gameState.waveActive && !gameOver && (
+                    <button onClick={handleStartWave} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'green', border: 'none' }}>
+                        <Play size={16} fill="white" /> 下一波
+                    </button>
+                )}
+
+                <button
+                    onClick={() => setAutoNextWave((prev) => !prev)}
+                    title={autoNextWave ? '目前: 開' : '目前: 關'}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: autoNextWave ? '#0e6b2a' : '#333',
+                        border: `1px solid ${autoNextWave ? '#54d67a' : '#555'}`
+                    }}
+                >
+                    <FastForward size={14} /> 跳關
+                </button>
+
+                <button onClick={handleExitWithRecord} style={{ marginLeft: 'auto' }}>離開</button>
             </div>
 
             <div style={{
@@ -2151,105 +2125,100 @@ const Game = ({ onExit }) => {
                     background: '#1a1a1a',
                     borderTop: '1px solid #444',
                     padding: '8px 8px max(8px, env(safe-area-inset-bottom))',
-                    display: 'grid',
-                    gridTemplateRows: '116px 1fr',
-                    gap: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
                     overflow: 'hidden',
                     zIndex: 12
                 }}>
-                    <div style={{ border: '1px solid #444', background: 'rgba(0,0,0,0.25)', padding: '6px', display: 'flex', flexDirection: 'column', gap: '6px', overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '6px' }}>
+                        {[
+                            { key: 'consumable', label: '道具' },
+                            { key: 'equipment', label: '裝備' },
+                            { key: 'wave', label: '關卡' },
+                            { key: 'towers', label: '塔資訊' },
+                            { key: 'rank', label: '排名' }
+                        ].map((tab) => (
                             <button
-                                onClick={() => setInventoryTab(ITEM_TYPES.CONSUMABLE)}
+                                key={`mobile-panel-${tab.key}`}
+                                onClick={() => {
+                                    setMobilePanelTab(tab.key);
+                                    if (tab.key === 'consumable') setInventoryTab(ITEM_TYPES.CONSUMABLE);
+                                    if (tab.key === 'equipment') setInventoryTab(ITEM_TYPES.EQUIPMENT);
+                                    if (tab.key === 'wave' || tab.key === 'towers' || tab.key === 'rank') setMobileInfoTab(tab.key);
+                                }}
                                 style={{
-                                    border: inventoryTab === ITEM_TYPES.CONSUMABLE ? '1px solid #7cff9a' : '1px solid #555',
-                                    background: inventoryTab === ITEM_TYPES.CONSUMABLE ? '#1f3a25' : '#1f1f1f',
-                                    color: '#ddd',
-                                    padding: '3px 7px',
-                                    fontSize: '0.74rem'
+                                    padding: '4px 6px',
+                                    fontSize: '0.72rem',
+                                    border: mobilePanelTab === tab.key ? '1px solid #7cff9a' : '1px solid #555',
+                                    background: mobilePanelTab === tab.key ? '#213025' : '#1f1f1f',
+                                    color: '#ddd'
                                 }}
                             >
-                                道具
+                                {tab.label}
                             </button>
-                            <button
-                                onClick={() => setInventoryTab(ITEM_TYPES.EQUIPMENT)}
-                                style={{
-                                    border: inventoryTab === ITEM_TYPES.EQUIPMENT ? '1px solid #7cff9a' : '1px solid #555',
-                                    background: inventoryTab === ITEM_TYPES.EQUIPMENT ? '#1f2d3a' : '#1f1f1f',
-                                    color: '#ddd',
-                                    padding: '3px 7px',
-                                    fontSize: '0.74rem'
-                                }}
-                            >
-                                裝備
-                            </button>
-                            <button
-                                onClick={() => shiftInventoryPage(inventoryTab, -1)}
-                                disabled={activeInventoryPage <= 0}
-                                style={{ marginLeft: 'auto', opacity: activeInventoryPage <= 0 ? 0.4 : 1, padding: '2px 8px' }}
-                            >
-                                {'<'}
-                            </button>
-                            <button
-                                onClick={() => shiftInventoryPage(inventoryTab, 1)}
-                                disabled={activeInventoryPage >= totalInventoryPages - 1}
-                                style={{ opacity: activeInventoryPage >= totalInventoryPages - 1 ? 0.4 : 1, padding: '2px 8px' }}
-                            >
-                                {'>'}
-                            </button>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '4px' }}>
-                            {mobileVisibleInventorySlots.map((stack, idx) => (
-                                <button
-                                    key={`mobile-inv-slot-${inventoryTab}-${activeInventoryPage}-${idx}`}
-                                    onClick={() => {
-                                        if (!stack) return;
-                                        setSelectedItemId((prev) => (prev === stack.id ? null : stack.id));
-                                    }}
-                                    style={{
-                                        aspectRatio: '1 / 1',
-                                        border: stack && selectedItemId === stack.id ? '2px solid #7cff9a' : '1px solid #666',
-                                        background: stack ? '#1f1f1f' : '#111',
-                                        color: '#ddd',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        padding: '2px 5px',
-                                        fontSize: '0.72rem'
-                                    }}
-                                >
-                                    <span>{stack?.icon || ''}</span>
-                                    <span>{stack?.count || ''}</span>
-                                </button>
-                            ))}
-                        </div>
+                        ))}
                     </div>
 
-                    <div style={{ border: '1px solid #444', background: 'rgba(0,0,0,0.25)', padding: '6px', display: 'flex', flexDirection: 'column', gap: '6px', overflow: 'hidden', color: '#ddd' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '30px 1fr 30px', gap: '6px', alignItems: 'center' }}>
-                            <button onClick={() => cycleMobileInfoTab(-1)}>{'<'}</button>
-                            <div style={{ display: 'flex', justifyContent: 'center', gap: '6px' }}>
-                                {mobileInfoTabs.map((tab) => (
+                    <div style={{ border: '1px solid #444', background: 'rgba(0,0,0,0.25)', padding: '6px', display: 'flex', flexDirection: 'column', gap: '6px', overflow: 'hidden', color: '#ddd', minHeight: 0 }}>
+                        {(mobilePanelTab === 'consumable' || mobilePanelTab === 'equipment') && (
+                            <>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                     <button
-                                        key={tab.key}
-                                        onClick={() => setMobileInfoTab(tab.key)}
+                                        onClick={() => shiftInventoryPage(inventoryTab, -1)}
+                                        disabled={activeInventoryPage <= 0}
                                         style={{
-                                            padding: '2px 6px',
-                                            fontSize: '0.72rem',
-                                            border: mobileInfoTab === tab.key ? '1px solid #7cff9a' : '1px solid #555',
-                                            background: mobileInfoTab === tab.key ? '#213025' : '#1f1f1f'
+                                            opacity: activeInventoryPage <= 0 ? 0.4 : 1,
+                                            padding: '2px 8px'
                                         }}
                                     >
-                                        {tab.label}
+                                        {'<'}
                                     </button>
-                                ))}
-                            </div>
-                            <button onClick={() => cycleMobileInfoTab(1)}>{'>'}</button>
-                        </div>
+                                    <div style={{ marginLeft: 'auto', marginRight: 'auto', fontSize: '0.72rem', color: '#8dd2ff' }}>
+                                        第 {activeInventoryPage + 1}/{totalInventoryPages} 頁
+                                    </div>
+                                    <button
+                                        onClick={() => shiftInventoryPage(inventoryTab, 1)}
+                                        disabled={activeInventoryPage >= totalInventoryPages - 1}
+                                        style={{
+                                            opacity: activeInventoryPage >= totalInventoryPages - 1 ? 0.4 : 1,
+                                            padding: '2px 8px'
+                                        }}
+                                    >
+                                        {'>'}
+                                    </button>
+                                </div>
 
-                        <div style={{ fontSize: '0.76rem', lineHeight: 1.35, overflow: 'hidden' }}>
-                            {mobileInfoTab === 'wave' && waveInfo && (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '4px' }}>
+                                    {mobileVisibleInventorySlots.map((stack, idx) => (
+                                        <button
+                                            key={`mobile-inv-slot-${inventoryTab}-${activeInventoryPage}-${idx}`}
+                                            onClick={() => {
+                                                if (!stack) return;
+                                                setSelectedItemId((prev) => (prev === stack.id ? null : stack.id));
+                                            }}
+                                            style={{
+                                                aspectRatio: '1 / 1',
+                                                border: stack && selectedItemId === stack.id ? '2px solid #7cff9a' : '1px solid #666',
+                                                background: stack ? '#1f1f1f' : '#111',
+                                                color: '#ddd',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                padding: '2px 5px',
+                                                fontSize: '0.72rem'
+                                            }}
+                                        >
+                                            <span>{stack?.icon || ''}</span>
+                                            <span>{stack?.count || ''}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
+                        <div style={{ fontSize: '0.76rem', lineHeight: 1.35, overflowY: 'auto', minHeight: 0 }}>
+                            {(mobilePanelTab === 'wave' || mobileInfoTab === 'wave') && mobilePanelTab === 'wave' && waveInfo && (
                                 <div>
                                     <div>波數 {gameState.wave} | 類型 {waveInfo.type} | 血量 {waveInfo.hp}</div>
                                     <div>出怪 {waveInfo.spawned}/{waveInfo.spawnTarget} | Boss 1 | 場上 {waveInfo.alive}</div>
@@ -2257,7 +2226,7 @@ const Game = ({ onExit }) => {
                                     {nextWaveInfo && <div>下波 {nextWaveInfo.type} | HP {nextWaveInfo.hp} | 目標 {nextWaveInfo.spawnTarget} | Boss 1</div>}
                                 </div>
                             )}
-                            {mobileInfoTab === 'towers' && (
+                            {(mobilePanelTab === 'towers' || mobileInfoTab === 'towers') && mobilePanelTab === 'towers' && (
                                 towerRows.length === 0 ? (
                                     <div style={{ color: '#8a8a8a' }}>目前還沒有塔</div>
                                 ) : (
@@ -2271,7 +2240,7 @@ const Game = ({ onExit }) => {
                                     ))
                                 )
                             )}
-                            {mobileInfoTab === 'rank' && (
+                            {(mobilePanelTab === 'rank' || mobileInfoTab === 'rank') && mobilePanelTab === 'rank' && (
                                 towerRankRows.length === 0 ? (
                                     <div style={{ color: '#8a8a8a' }}>目前沒有可排名的塔</div>
                                 ) : (
@@ -2282,13 +2251,17 @@ const Game = ({ onExit }) => {
                                     ))
                                 )
                             )}
-                            {!selectedInventoryItem && (
-                                <div style={{ marginTop: '4px', color: '#8dd2ff' }}>選取道具後點地圖上的塔使用</div>
-                            )}
-                            {selectedInventoryItem && (
-                                <div style={{ marginTop: '4px', color: '#9bcf9f' }}>
-                                    已選: {selectedInventoryItem.name} x{selectedInventoryItem.count}
-                                </div>
+                            {(mobilePanelTab === 'consumable' || mobilePanelTab === 'equipment') && (
+                                <>
+                                    {!selectedInventoryItem && (
+                                        <div style={{ marginTop: '4px', color: '#8dd2ff' }}>選取道具後點地圖上的塔使用</div>
+                                    )}
+                                    {selectedInventoryItem && (
+                                        <div style={{ marginTop: '4px', color: '#9bcf9f' }}>
+                                            已選: {selectedInventoryItem.name} x{selectedInventoryItem.count}
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
