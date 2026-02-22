@@ -747,6 +747,58 @@ const Game = ({ onExit }) => {
                     ctx.fill();
                 }
 
+                const mobCx = mob.x * CELL_SIZE + CELL_SIZE / 2;
+                const mobCy = mob.y * CELL_SIZE + CELL_SIZE / 2;
+                const pulse = (Math.sin(nowMs * 0.02) + 1) * 0.5;
+
+                if ((mob.stunVisualTimer || 0) > 0) {
+                    ctx.fillStyle = `rgba(255, 220, 90, ${0.45 + pulse * 0.4})`;
+                    for (let i = 0; i < 3; i++) {
+                        const a = (nowMs * 0.006) + (i * (Math.PI * 2 / 3));
+                        ctx.beginPath();
+                        ctx.arc(mobCx + Math.cos(a) * 11, mobCy - 14 + Math.sin(a) * 4, 2.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+
+                if ((mob.palsyVisualTimer || 0) > 0) {
+                    ctx.strokeStyle = `rgba(120, 220, 255, ${0.45 + pulse * 0.5})`;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(mobCx - 8, mobCy - 6);
+                    ctx.lineTo(mobCx - 2, mobCy - 12);
+                    ctx.lineTo(mobCx + 1, mobCy - 4);
+                    ctx.lineTo(mobCx + 7, mobCy - 10);
+                    ctx.stroke();
+                }
+
+                if ((mob.slowMultiplier || 1) < 0.99 || (mob.slowEffectTimer || 0) > 0) {
+                    ctx.strokeStyle = `rgba(120, 180, 255, ${0.25 + pulse * 0.35})`;
+                    ctx.lineWidth = 1.8;
+                    ctx.beginPath();
+                    ctx.arc(mobCx, mobCy, 12 + pulse * 2, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+
+                if ((mob.knockbackFxTimer || 0) > 0) {
+                    ctx.strokeStyle = 'rgba(255, 170, 90, 0.75)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(mobCx - 10, mobCy + 6);
+                    ctx.lineTo(mobCx - 16, mobCy + 10);
+                    ctx.moveTo(mobCx - 8, mobCy);
+                    ctx.lineTo(mobCx - 15, mobCy + 2);
+                    ctx.stroke();
+                }
+
+                if ((mob.poisonStacks?.length || 0) > 0 || (mob.poisonEffectTimer || 0) > 0) {
+                    ctx.fillStyle = `rgba(100, 255, 130, ${0.25 + pulse * 0.35})`;
+                    ctx.beginPath();
+                    ctx.arc(mobCx + 7, mobCy - 10, 3, 0, Math.PI * 2);
+                    ctx.arc(mobCx - 6, mobCy - 8, 2.2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
                 const hpPct = Math.max(0, mob.hp / mob.maxHp);
                 const hue = hpPct * 120;
 
@@ -837,6 +889,67 @@ const Game = ({ onExit }) => {
                     ctx.lineTo(cx + 10, cy - 10);
                     ctx.moveTo(cx + 10, cy + 10);
                     ctx.lineTo(cx - 10, cy - 10);
+                    ctx.stroke();
+                } else if (eff.type === 'fire_spell') {
+                    const alpha = Math.max(0, eff.life / (eff.maxLife || 0.35));
+                    ctx.strokeStyle = `rgba(255, 120, 80, ${alpha})`;
+                    ctx.lineWidth = 2.2;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, ((eff.radius || 2) * CELL_SIZE * 0.35) + (1 - alpha) * 10, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else if (eff.type === 'water_spell') {
+                    const alpha = Math.max(0, eff.life / (eff.maxLife || 0.35));
+                    ctx.strokeStyle = `rgba(120, 190, 255, ${alpha})`;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, ((eff.radius || 2) * CELL_SIZE * 0.3) + (1 - alpha) * 12, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else if (eff.type === 'fire_aura_proc') {
+                    const alpha = Math.max(0, eff.life / (eff.maxLife || 0.3));
+                    const r = ((eff.radius || 2) * CELL_SIZE * 0.28) + (1 - alpha) * 10;
+                    ctx.strokeStyle = `rgba(255, 145, 95, ${alpha})`;
+                    ctx.lineWidth = 2.4;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.fillStyle = `rgba(255, 110, 70, ${alpha * 0.28})`;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (eff.type === 'water_aura_proc') {
+                    const alpha = Math.max(0, eff.life / (eff.maxLife || 0.32));
+                    ctx.strokeStyle = `rgba(120, 215, 255, ${alpha})`;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 7 + (1 - alpha) * 14, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 4 + (1 - alpha) * 8, 0, Math.PI * 2);
+                    ctx.stroke();
+                } else if (eff.type === 'lightning_strike') {
+                    const alpha = Math.max(0, eff.life / (eff.maxLife || 0.16));
+                    ctx.strokeStyle = `rgba(150, 230, 255, ${alpha})`;
+                    ctx.lineWidth = 2.2;
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 3, cy - 12);
+                    ctx.lineTo(cx + 2, cy - 5);
+                    ctx.lineTo(cx - 1, cy - 1);
+                    ctx.lineTo(cx + 4, cy + 6);
+                    ctx.stroke();
+                } else if (eff.type === 'chain_arc') {
+                    const alpha = Math.max(0, eff.life / (eff.maxLife || 0.12));
+                    const fromX = (eff.fromX ?? eff.x) * CELL_SIZE;
+                    const fromY = (eff.fromY ?? eff.y) * CELL_SIZE;
+                    const toX = (eff.toX ?? eff.x) * CELL_SIZE;
+                    const toY = (eff.toY ?? eff.y) * CELL_SIZE;
+                    ctx.strokeStyle = `rgba(140, 220, 255, ${alpha})`;
+                    ctx.lineWidth = 1.8;
+                    const midX = (fromX + toX) * 0.5 + ((Math.random() - 0.5) * 12);
+                    const midY = (fromY + toY) * 0.5 + ((Math.random() - 0.5) * 12);
+                    ctx.beginPath();
+                    ctx.moveTo(fromX, fromY);
+                    ctx.lineTo(midX, midY);
+                    ctx.lineTo(toX, toY);
                     ctx.stroke();
                 }
             });
@@ -1116,6 +1229,24 @@ const Game = ({ onExit }) => {
         });
     };
 
+    const tryUseGlobalItem = (itemId) => {
+        if (!engineRef.current) return false;
+        if (itemId !== 'build_book') return false;
+
+        const result = engineRef.current.applyGlobalItem(itemId);
+        if (!result?.ok) {
+            appendConsoleLog(result?.message || '道具使用失敗');
+            triggerSfx('error');
+            return true;
+        }
+
+        consumeSelectedItem(itemId);
+        if (selectedItemId === itemId) setSelectedItemId(null);
+        appendConsoleLog(result.message);
+        triggerSfx('item');
+        return true;
+    };
+
     const handleCellClick = (x, y) => {
         if (gameOver || isInteractionModalOpen || !engineRef.current) return;
 
@@ -1370,13 +1501,14 @@ const Game = ({ onExit }) => {
         ? (() => {
             const cfg = engine.getWaveConfig(gameState.wave);
             const density = engine.getMobDensityMultiplier();
+            const waveCountScale = engine.getWaveMobCountScale ? engine.getWaveMobCountScale(gameState.wave) : 1;
             const affixes = engine.getWaveAffixes ? engine.getWaveAffixes(gameState.wave) : [];
             const speedUp = affixes.find((a) => a.id === 'move_speed_up')?.value || 0;
             const hpUp = affixes.find((a) => a.id === 'hp_percent_up')?.value || 0;
             const hp = 10 * gameState.wave * engine.getMobHpMultiplier() * engine.getWaveHpScale(gameState.wave) * (1 + hpUp);
             return {
                 type: cfg.type,
-                spawnTarget: Math.max(1, Math.floor(cfg.count * density)),
+                spawnTarget: Math.max(1, Math.floor(cfg.count * waveCountScale * density)),
                 bossCount: 1,
                 spawned: engine.mobsSpawned || 0,
                 alive: engine.mobs.length || 0,
@@ -1394,6 +1526,7 @@ const Game = ({ onExit }) => {
             const nextWave = gameState.wave + 1;
             const cfg = engine.getWaveConfig(nextWave);
             const density = engine.getMobDensityMultiplier();
+            const waveCountScale = engine.getWaveMobCountScale ? engine.getWaveMobCountScale(nextWave) : 1;
             const affixes = engine.getWaveAffixes ? engine.getWaveAffixes(nextWave) : [];
             const speedUp = affixes.find((a) => a.id === 'move_speed_up')?.value || 0;
             const hpUp = affixes.find((a) => a.id === 'hp_percent_up')?.value || 0;
@@ -1401,7 +1534,7 @@ const Game = ({ onExit }) => {
             return {
                 wave: nextWave,
                 type: cfg.type,
-                spawnTarget: Math.max(1, Math.floor(cfg.count * density)),
+                spawnTarget: Math.max(1, Math.floor(cfg.count * waveCountScale * density)),
                 bossCount: 1,
                 hpScale: engine.getWaveHpScale(nextWave),
                 hp: Math.floor(hp),
@@ -1999,6 +2132,7 @@ const Game = ({ onExit }) => {
                                             key={`inv-slot-${inventoryTab}-${activeInventoryPage}-${idx}`}
                                             onClick={() => {
                                                 if (!stack) return;
+                                                if (tryUseGlobalItem(stack.id)) return;
                                                 setSelectedItemId((prev) => (prev === stack.id ? null : stack.id));
                                             }}
                                             style={{
@@ -2236,6 +2370,7 @@ const Game = ({ onExit }) => {
                                             key={`mobile-inv-slot-${inventoryTab}-${activeInventoryPage}-${idx}`}
                                             onClick={() => {
                                                 if (!stack) return;
+                                                if (tryUseGlobalItem(stack.id)) return;
                                                 setSelectedItemId((prev) => (prev === stack.id ? null : stack.id));
                                             }}
                                             style={{

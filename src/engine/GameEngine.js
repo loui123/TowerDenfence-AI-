@@ -135,6 +135,16 @@ export class GameEngine {
                 desc: `怪物生命增加 ${(hpUp * 100).toFixed(0)}%`
             };
         }
+        if (id === 'knockback_resist') {
+            const progress = Math.max(0, Math.min(1, (wave - 1) / 49));
+            const resist = 0.1 + ((0.95 - 0.1) * progress);
+            return {
+                id,
+                name: '擊退效果減免',
+                value: resist,
+                desc: `承受擊退效果減少 ${(resist * 100).toFixed(0)}%`
+            };
+        }
         return null;
     }
 
@@ -151,7 +161,8 @@ export class GameEngine {
             projectile_dmg_reduction: 10,
             elemental_dmg_reduction: 10,
             move_speed_up: 30,
-            hp_percent_up: 40
+            hp_percent_up: 40,
+            knockback_resist: 40
         };
     }
 
@@ -185,10 +196,14 @@ export class GameEngine {
         if (wave <= 10) return [];
 
         const affixCount = (() => {
-            if (wave >= 50) {
+            if (wave >= 31) {
+                let count = 2;
+                if (Math.random() < 0.35) count += 1;
+                return count;
+            }
+            if (wave >= 21) {
                 let count = 1;
-                if (Math.random() < 0.55) count += 1;
-                if (Math.random() < 0.3) count += 1;
+                if (Math.random() < 0.35) count += 1;
                 return count;
             }
             return Math.random() < 0.35 ? 1 : 0;
@@ -361,7 +376,8 @@ export class GameEngine {
             x, y, type,
             life: opts.life ?? 0.3,
             maxLife: opts.maxLife ?? (opts.life ?? 0.3),
-            angle: Math.random() * Math.PI * 2
+            angle: Math.random() * Math.PI * 2,
+            ...opts
         });
     }
 
@@ -380,7 +396,8 @@ export class GameEngine {
         const config = this.getWaveConfig(this.wave);
 
         const densityMultiplier = this.getMobDensityMultiplier();
-        const waveCount = Math.max(1, Math.floor(config.count * densityMultiplier));
+        const waveCountScale = this.getWaveMobCountScale(this.wave);
+        const waveCount = Math.max(1, Math.floor(config.count * waveCountScale * densityMultiplier));
         const spawnInterval = 1.0 / densityMultiplier;
 
         if (this.mobsSpawned < waveCount) {
@@ -1289,8 +1306,13 @@ export class GameEngine {
     }
 
     getWaveHpScale(wave) {
-        if (wave <= 10) return 1.1;
-        return 1.1 * Math.pow(1.2, wave - 10);
+        if (wave <= 10) return 1;
+        return Math.pow(1.2, wave - 10);
+    }
+
+    getWaveMobCountScale(wave) {
+        const safeWave = Math.max(1, Math.floor(wave || 1));
+        return Math.pow(1.1, safeWave - 1);
     }
 
     getTowerAt(gridX, gridY) {
@@ -1467,6 +1489,13 @@ export class GameEngine {
         }
 
         mob.stunTimer = Math.max(mob.stunTimer || 0, duration);
+        if (effectType === 'palsy') {
+            mob.palsyVisualTimer = Math.max(mob.palsyVisualTimer || 0, duration);
+            this.addEffect(mob.x + 0.5, mob.y + 0.5, 'palsy_status', { life: 0.25, maxLife: 0.25 });
+        } else {
+            mob.stunVisualTimer = Math.max(mob.stunVisualTimer || 0, duration);
+            this.addEffect(mob.x + 0.5, mob.y + 0.5, 'stun_status', { life: 0.25, maxLife: 0.25 });
+        }
     }
 
     applyOnHitEffects(primaryTarget, sourceTower) {
@@ -1492,6 +1521,8 @@ export class GameEngine {
                 const dy = mob.y - primaryTarget.y;
                 if (dx * dx + dy * dy > radiusSq) continue;
                 this.knockbackMob(mob, knockbackDist);
+                mob.knockbackFxTimer = Math.max(mob.knockbackFxTimer || 0, 0.25);
+                this.addEffect(mob.x + 0.5, mob.y + 0.5, 'knockback_status', { life: 0.2, maxLife: 0.2 });
                 if (knockbackStun > 0) {
                     this.applyStun(mob, knockbackStun);
                 }
@@ -1503,6 +1534,7 @@ export class GameEngine {
         }
 
         if (this.globalMasteries.waterMastery && Math.random() < 0.25) {
+            this.addEffect(primaryTarget.x + 0.5, primaryTarget.y + 0.5, 'water_aura_proc', { life: 0.32, maxLife: 0.32 });
             this.applyStun(primaryTarget, 0.15);
             this.damageMob(primaryTarget, { base: 0, fire: 0, water: sourceBase * 0.5, wood: 0 }, sourceTower, false);
         }
@@ -1513,6 +1545,7 @@ export class GameEngine {
         }
 
         if (this.globalMasteries.fireMastery) {
+            this.addEffect(primaryTarget.x + 0.5, primaryTarget.y + 0.5, 'fire_aura_proc', { life: 0.3, maxLife: 0.3, radius: 2 });
             this.applyFireExplosion(primaryTarget, sourceTower, sourceBase * 0.2, 2);
         }
         if (sourceTower.localFireExplosion) {
@@ -1535,13 +1568,15 @@ export class GameEngine {
         if (!primaryTarget || !sourceTower?.equipmentId) return;
 
         if (sourceTower.equipmentId === 'chain_lightning') {
-            this.triggerChainLightning(primaryTarget, sourceTower, 20, 20, 0.1, 1.0);
+            this.triggerChainLightning(primaryTarget, sourceTower, 20 * (sourceTower.level || 1), 20, 0.1, 1.0);
         }
     }
 
     triggerChainLightning(originTarget, sourceTower, damage, maxChains, paralyzeChance, paralyzeSec) {
         let currentTarget = originTarget;
         const chainedIds = new Set();
+        let prevX = sourceTower.x + 0.5;
+        let prevY = sourceTower.y + 0.5;
 
         for (let i = 0; i <= maxChains; i++) {
             if (!currentTarget) break;
@@ -1549,15 +1584,28 @@ export class GameEngine {
             if (currentId !== undefined) chainedIds.add(currentId);
 
             if (this.mobs.includes(currentTarget)) {
+                this.addEffect(currentTarget.x + 0.5, currentTarget.y + 0.5, 'lightning_strike', { life: 0.16, maxLife: 0.16 });
+                this.addEffect((prevX + currentTarget.x + 0.5) / 2, (prevY + currentTarget.y + 0.5) / 2, 'chain_arc', {
+                    life: 0.12,
+                    maxLife: 0.12,
+                    fromX: prevX,
+                    fromY: prevY,
+                    toX: currentTarget.x + 0.5,
+                    toY: currentTarget.y + 0.5
+                });
                 this.addEffect(currentTarget.x + 0.5, currentTarget.y + 0.5, 'hit', { life: 0.12, maxLife: 0.12 });
                 this.damageMob(currentTarget, { base: damage, fire: 0, water: 0, wood: 0 }, sourceTower, false);
-                if (this.mobs.includes(currentTarget) && Math.random() < paralyzeChance) {
+                // 每段連鎖命中都獨立計算一次麻痺機率
+                const shouldParalyze = Math.random() < paralyzeChance;
+                if (this.mobs.includes(currentTarget) && shouldParalyze) {
                     this.applyStun(currentTarget, paralyzeSec, 'palsy');
                 }
             }
 
             const nextTarget = this.findChainTarget(currentTarget, chainedIds);
             if (!nextTarget) break;
+            prevX = currentTarget.x + 0.5;
+            prevY = currentTarget.y + 0.5;
             currentTarget = nextTarget;
         }
     }
@@ -1609,6 +1657,15 @@ export class GameEngine {
         }
 
         return leveled;
+    }
+
+    applyGlobalItem(itemId) {
+        if (!itemId) return { ok: false, message: '未指定道具。' };
+        if (itemId === 'build_book') {
+            this.towerLimitBonus = (this.towerLimitBonus || 0) + 1;
+            return { ok: true, message: '建設之書使用成功，本局建塔上限 +1' };
+        }
+        return { ok: false, message: '此道具不是全域立即使用道具。' };
     }
 
     applyInventoryItem(tower, itemId) {
@@ -1876,6 +1933,8 @@ export class GameEngine {
             if (dx * dx + dy * dy <= radiusSq) {
                 mob.slowStacks = mob.slowStacks || [];
                 mob.slowStacks.push({ mult: slowMult, duration: 3 });
+                mob.slowEffectTimer = Math.max(mob.slowEffectTimer || 0, 0.4);
+                this.addEffect(mob.x + 0.5, mob.y + 0.5, 'slow_status', { life: 0.2, maxLife: 0.2 });
             }
         }
     }
@@ -1916,9 +1975,12 @@ export class GameEngine {
             tickTimer: tickInterval,
             tickInterval
         });
+        target.poisonEffectTimer = Math.max(target.poisonEffectTimer || 0, 0.5);
+        this.addEffect(target.x + 0.5, target.y + 0.5, 'poison_status', { life: 0.25, maxLife: 0.25 });
     }
 
     applyFireExplosion(centerTarget, sourceTower, damage, radius) {
+        this.addEffect(centerTarget.x + 0.5, centerTarget.y + 0.5, 'fire_spell', { life: 0.35, maxLife: 0.35, radius });
         const radiusSq = radius * radius;
         for (const mob of this.mobs) {
             const dx = mob.x - centerTarget.x;
@@ -1958,6 +2020,7 @@ export class GameEngine {
     }
 
     applyWaterSplash(centerTarget, sourceTower, damage, radius) {
+        this.addEffect(centerTarget.x + 0.5, centerTarget.y + 0.5, 'water_spell', { life: 0.35, maxLife: 0.35, radius });
         const radiusSq = radius * radius;
         for (const mob of this.mobs) {
             const dx = mob.x - centerTarget.x;
@@ -2039,6 +2102,12 @@ export class GameEngine {
     }
 
     updateMobStatusEffects(mob, dt) {
+        mob.stunVisualTimer = Math.max(0, (mob.stunVisualTimer || 0) - dt);
+        mob.palsyVisualTimer = Math.max(0, (mob.palsyVisualTimer || 0) - dt);
+        mob.slowEffectTimer = Math.max(0, (mob.slowEffectTimer || 0) - dt);
+        mob.knockbackFxTimer = Math.max(0, (mob.knockbackFxTimer || 0) - dt);
+        mob.poisonEffectTimer = Math.max(0, (mob.poisonEffectTimer || 0) - dt);
+
         if (mob.bleedMap) {
             for (const key of Object.keys(mob.bleedMap)) {
                 const entry = mob.bleedMap[key];
@@ -2101,8 +2170,12 @@ export class GameEngine {
     }
 
     knockbackMob(mob, distance) {
+        const knockbackResist = Math.max(0, Math.min(0.95, mob?.affixMap?.knockback_resist || 0));
+        const effectiveDistance = Math.max(0, distance * (1 - knockbackResist));
+        if (effectiveDistance <= 0) return;
+
         const current = (mob.pathIndex || 0) + (mob.progress || 0);
-        const next = Math.max(0, current - distance);
+        const next = Math.max(0, current - effectiveDistance);
         const nextIndex = Math.floor(next);
         const nextProgress = next - nextIndex;
 

@@ -70,9 +70,9 @@ export const ITEM_DEFS = {
     },
     chain_lightning: {
         id: 'chain_lightning',
-        name: '連鎖雷擊',
+        name: '閃電',
         type: ITEM_TYPES.EQUIPMENT,
-        description: '攻擊命中時，對同目標追加連鎖雷擊（20 傷害，10% 機率麻痺 1 秒）。',
+        description: '塔命中時觸發閃電連鎖（20*塔等級傷害、20 次連鎖、10% 機率麻痺 1 秒）。',
         icon: '雷',
         source: 'all'
     },
