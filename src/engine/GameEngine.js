@@ -39,6 +39,7 @@ export class GameEngine {
             fireMastery: false,
             waterMastery: false,
             woodMastery: false,
+            woodPoisonDurationBonus: 0,
             critAura: false,
             critDmgAura: false
         };
@@ -51,40 +52,6 @@ export class GameEngine {
         const def = Object.values(TALENTS).find(t => t.id === id);
         if (!def) return 0;
         return level * def.perLevel;
-    }
-
-    getTowerTalentProfile(typeId) {
-        if (typeId === 'melee') {
-            return {
-                baseDmgId: 'melee_tower_dmg_base',
-                attrDmgId: 'melee_tower_attr_dmg',
-                atkSpeedId: 'melee_tower_atk_speed',
-                critChanceId: 'melee_tower_crit_chance',
-                rangeId: 'melee_tower_range'
-            };
-        }
-
-        if (typeId === 'magic') {
-            return {
-                baseDmgId: 'spell_tower_dmg_base',
-                attrDmgId: null,
-                atkSpeedId: 'spell_tower_atk_speed',
-                critChanceId: null,
-                rangeId: 'spell_tower_range'
-            };
-        }
-
-        if (typeId === 'projectile' || typeId === 'projectile_slow' || typeId === 'projectile_aoe') {
-            return {
-                baseDmgId: 'range_tower_dmg_base',
-                attrDmgId: 'range_tower_attr_dmg',
-                atkSpeedId: 'range_tower_atk_speed',
-                critChanceId: 'range_tower_crit_chance',
-                rangeId: 'range_tower_range'
-            };
-        }
-
-        return null;
     }
 
     getTowerStats(typeId) {
@@ -106,19 +73,13 @@ export class GameEngine {
             };
         }
 
-        const profile = this.getTowerTalentProfile(typeId);
-        const rangeBonus = profile?.rangeId ? this.getTalentValue(profile.rangeId) : 0;
-        const speedBonus = profile?.atkSpeedId ? this.getTalentValue(profile.atkSpeedId) : 0;
-        const critBonus = profile?.critChanceId ? this.getTalentValue(profile.critChanceId) : 0;
-        const baseBonus = profile?.baseDmgId ? this.getTalentValue(profile.baseDmgId) : 0;
-        const attrBonus = profile?.attrDmgId ? this.getTalentValue(profile.attrDmgId) : 0;
         const levelMults = {
-            range: statsBase.range + rangeBonus,
-            speed: statsBase.speed * (1 + speedBonus),
-            crit: statsBase.crit + critBonus,
+            range: statsBase.range + this.getTalentValue('tower_range'),
+            speed: statsBase.speed * (1 + this.getTalentValue('tower_atk_speed')),
+            crit: statsBase.crit + this.getTalentValue('tower_crit_chance'),
         };
 
-        const baseDmgCalc = (statsBase.damage + baseBonus) * (1 + attrBonus);
+        const baseDmgCalc = (statsBase.damage + this.getTalentValue('tower_dmg_base')) * (1 + this.getTalentValue('tower_attr_dmg'));
 
         return {
             ...statsBase,
@@ -391,7 +352,7 @@ export class GameEngine {
             return 1;
         }
         const baseCount = 1;
-        const bonusCount = Math.max(0, Math.floor(this.getTalentValue('range_tower_proj_count'))) + (tower?.bonusTargets || 0);
+        const bonusCount = Math.max(0, Math.floor(this.getTalentValue('tower_proj_count'))) + (tower?.bonusTargets || 0);
         return baseCount + bonusCount;
     }
 
@@ -399,7 +360,7 @@ export class GameEngine {
         if (tower?.stats?.type === 'magic') {
             return 0;
         }
-        return Math.max(0, Math.floor(this.getTalentValue('range_tower_chain'))) + (tower?.bonusChain || 0);
+        return Math.max(0, Math.floor(this.getTalentValue('tower_chain'))) + (tower?.bonusChain || 0);
     }
 
     findTargets(tower, maxTargets = 1) {
@@ -564,7 +525,10 @@ export class GameEngine {
                 }
 
                 if (canHit && (p.remainingChains || 0) > 0) {
-                    const excludedIds = new Set([...(p.hitHistory || []), target.id]);
+                    const allowRepeatChain = !!p.sourceTower?.chainNoLimit;
+                    const excludedIds = allowRepeatChain
+                        ? new Set([target.id])
+                        : new Set([...(p.hitHistory || []), target.id]);
                     const nextTarget = this.findChainTarget(target, excludedIds);
                     if (nextTarget) {
                         p.targetId = nextTarget.id;
@@ -573,8 +537,8 @@ export class GameEngine {
                         p.lastKnownTargetX = nextTarget.x + 0.5;
                         p.lastKnownTargetY = nextTarget.y + 0.5;
                         p.remainingChains -= 1;
-                        p.chainMultiplier = (p.chainMultiplier || 1) * 0.7;
-                        p.hitHistory = [...excludedIds];
+                        p.chainMultiplier = allowRepeatChain ? (p.chainMultiplier || 1) : (p.chainMultiplier || 1) * 0.7;
+                        p.hitHistory = allowRepeatChain ? [] : [...excludedIds];
                         continue;
                     }
                 }
@@ -687,11 +651,9 @@ export class GameEngine {
         if (!mob || !this.events?.onItemDrop) return;
         const table = MONSTER_ITEM_DROP_TABLE[mob.type] || [];
         if (table.length === 0) return;
-        const itemDropMult = 1 + this.getTalentValue('item_drop_rate');
 
         for (const entry of table) {
-            const finalChance = Math.min(1, entry.chance * itemDropMult);
-            if (Math.random() < finalChance) {
+            if (Math.random() < entry.chance) {
                 this.events.onItemDrop(entry.itemId, 1, mob.type);
             }
         }
@@ -726,6 +688,12 @@ export class GameEngine {
             case 'proj_count_up': tower.bonusTargets = (tower.bonusTargets || 0) + 1; break;
             case 'melee_bleed':
                 tower.bleedLevel = (tower.bleedLevel || 0) + 1;
+                break;
+            case 'poison_dmg':
+                tower.poisonDamageLevel = (tower.poisonDamageLevel || 0) + 1;
+                break;
+            case 'poison_duration':
+                tower.poisonDurationLevel = (tower.poisonDurationLevel || 0) + 1;
                 break;
             case 'addition_attack':
                 tower.additionalAttackCount = (tower.additionalAttackCount || 0) + 1;
@@ -867,12 +835,16 @@ export class GameEngine {
                 break;
             case 'spec_wood_global':
                 this.globalMasteries.woodMastery = true;
+                this.globalMasteries.woodPoisonDurationBonus = 5;
                 break;
             case 'spec_crit_global':
                 this.globalMasteries.critAura = true;
                 break;
             case 'spec_crit_dmg_global':
                 this.globalMasteries.critDmgAura = true;
+                break;
+            case 'spec_chain_no_limit':
+                tower.chainNoLimit = true;
                 break;
             case 'spec_tower_speed_50':
                 tower.masterySpeedMult = (tower.masterySpeedMult || 1) * 1.2;
@@ -902,6 +874,10 @@ export class GameEngine {
             case 'spec_tower_half_dmg_double_speed':
                 tower.stats.damage *= 0.5;
                 tower.masterySpeedMult = (tower.masterySpeedMult || 1) * 2.0;
+                break;
+            case 'spec_tower_bleed':
+                tower.bleedDamageMult = (tower.bleedDamageMult || 1) * 3.0;
+                tower.bleedDurationOverride = Math.max(tower.bleedDurationOverride || 0, 10);
                 break;
             default:
                 return false;
@@ -941,7 +917,11 @@ export class GameEngine {
                 bonusChain: 0,
                 bonusTargets: 0,
                 bleedLevel: 0,
+                bleedDamageMult: 1,
+                bleedDurationOverride: 0,
                 slowPowerLevel: 0,
+                poisonDamageLevel: 0,
+                poisonDurationLevel: 0,
                 upgradeStats: {},
                 pendingSpecialization: false,
                 specializationChosen: false,
@@ -951,6 +931,7 @@ export class GameEngine {
                 hitStun: 0,
                 localFireExplosion: false,
                 disableAttributes: false,
+                chainNoLimit: false,
                 additionalAttackCount: 0,
                 knockbackBonus: 0,
                 speedMagicApplied: false,
@@ -1000,7 +981,8 @@ export class GameEngine {
     }
 
     getMaxGameSpeedMultiplier() {
-        return 2;
+        const gameSpeedTalentLevel = this.talents.game_speed || 0;
+        return 1 + Math.min(4, gameSpeedTalentLevel) * 0.25;
     }
 
     setGameSpeedMultiplier(nextSpeed) {
@@ -1021,8 +1003,8 @@ export class GameEngine {
     }
 
     getWaveHpScale(wave) {
-        if (wave <= 10) return 1;
-        return Math.pow(1.3, wave - 10);
+        if (wave <= 10) return 0.8;
+        return 0.8 * Math.pow(1, wave - 10);
     }
 
     getTowerAt(gridX, gridY) {
@@ -1186,7 +1168,8 @@ export class GameEngine {
         }
 
         if (this.globalMasteries.woodMastery) {
-            this.addPoisonStack(primaryTarget, sourceTower, sourceBase * 0.1, 4);
+            const extraDuration = this.globalMasteries.woodPoisonDurationBonus || 0;
+            this.addPoisonStack(primaryTarget, sourceTower, sourceBase * 0.3, 4 + extraDuration);
         }
 
         if (this.globalMasteries.fireMastery) {
@@ -1194,6 +1177,14 @@ export class GameEngine {
         }
         if (sourceTower.localFireExplosion) {
             this.applyFireExplosion(primaryTarget, sourceTower, sourceBase * 0.5, 3);
+        }
+
+        if ((sourceTower.upgradeStats?.wood_dmg || 0) > 0) {
+            const poisonDmgLv = sourceTower.poisonDamageLevel || 0;
+            const poisonDurationLv = sourceTower.poisonDurationLevel || 0;
+            const perTick = sourceBase * 0.1 * (1 + (0.4 * poisonDmgLv));
+            const duration = 4 + (2 * poisonDurationLv);
+            this.addPoisonStack(primaryTarget, sourceTower, perTick, duration);
         }
 
         this.applyMagicElementEffects(primaryTarget, sourceTower);
@@ -1240,7 +1231,7 @@ export class GameEngine {
 
         if (this.isSupportTower(tower)) {
             tower.supportExp = (tower.supportExp || 0) + amount;
-            while ((tower.supportExp || 0) >= 15 && tower.level < 15) {
+            while ((tower.supportExp || 0) >= 15 && tower.level < 10) {
                 tower.supportExp -= 15;
                 this.levelUpTower(tower, 1);
             }
@@ -1248,7 +1239,7 @@ export class GameEngine {
         }
 
         tower.kills = (tower.kills || 0) + amount;
-        while (tower.kills >= 10 && tower.level < 15) {
+        while (tower.kills >= 10 && tower.level < 10) {
             tower.kills -= 10;
             this.levelUpTower(tower, 1);
         }
@@ -1259,7 +1250,7 @@ export class GameEngine {
         let leveled = false;
 
         for (let i = 0; i < levels; i++) {
-            if (tower.level >= 15) break;
+            if (tower.level >= 10) break;
             tower.level += 1;
             tower.pendingUpgrades = (tower.pendingUpgrades || 0) + 1;
             leveled = true;
@@ -1268,7 +1259,7 @@ export class GameEngine {
                 this.events.onTowerUpgradeAvailable(tower);
             }
 
-            if (tower.level >= 15 && !tower.specializationChosen) {
+            if (tower.level >= 10 && !tower.specializationChosen) {
                 tower.pendingSpecialization = true;
                 if (this.events.onTowerSpecializationAvailable) {
                     this.events.onTowerSpecializationAvailable(tower);
@@ -1292,7 +1283,7 @@ export class GameEngine {
 
         if (item.type === ITEM_TYPES.CONSUMABLE) {
             if (itemId === 'level_book') {
-                if (tower.level >= 15) {
+                if (tower.level >= 10) {
                     return { ok: false, message: '滿等塔無法使用等級之書' };
                 }
                 this.levelUpTower(tower, 1);
@@ -1321,17 +1312,15 @@ export class GameEngine {
             if (itemId === 'lubricant') {
                 const towerDef = Object.values(TOWER_TYPES).find((t) => t.id === tower.type) || TOWER_TYPES.MELEE;
                 const typeBaseSpeed = towerDef?.stats?.speed || 1;
-                const talentProfile = this.getTowerTalentProfile(tower.type);
-                const talentSpeedMult = 1 + (talentProfile?.atkSpeedId ? this.getTalentValue(talentProfile.atkSpeedId) : 0);
+                const talentSpeedMult = 1 + this.getTalentValue('tower_atk_speed');
                 const previousBaseWithTalent = Math.max(0.0001, typeBaseSpeed * talentSpeedMult);
                 const existingBonusMult = Math.max(0, (tower.stats.speed || 0) / previousBaseWithTalent);
                 tower.stats.speed = talentSpeedMult * existingBonusMult;
             } else if (itemId === 'full_firepower') {
                 const towerDef = Object.values(TOWER_TYPES).find((t) => t.id === tower.type) || TOWER_TYPES.MELEE;
                 const typeBaseDamage = towerDef?.stats?.damage || 1;
-                const talentProfile = this.getTowerTalentProfile(tower.type);
-                const talentBaseBonus = talentProfile?.baseDmgId ? this.getTalentValue(talentProfile.baseDmgId) : 0;
-                const talentAttrMult = 1 + (talentProfile?.attrDmgId ? this.getTalentValue(talentProfile.attrDmgId) : 0);
+                const talentBaseBonus = this.getTalentValue('tower_dmg_base');
+                const talentAttrMult = 1 + this.getTalentValue('tower_attr_dmg');
                 const previousBaseWithTalent = Math.max(0.0001, (typeBaseDamage + talentBaseBonus) * talentAttrMult);
                 const existingBonusMult = Math.max(0, (tower.stats.damage || 0) / previousBaseWithTalent);
                 tower.stats.damage = Math.max(0, (40 + talentBaseBonus) * talentAttrMult * existingBonusMult);
@@ -1520,7 +1509,7 @@ export class GameEngine {
             if ((dx * dx + dy * dy) > (range * range)) continue;
 
             tower.supportExp = (tower.supportExp || 0) + 1;
-            while ((tower.supportExp || 0) >= 15 && tower.level < 15) {
+            while ((tower.supportExp || 0) >= 15 && tower.level < 10) {
                 tower.supportExp -= 15;
                 this.levelUpTower(tower, 1);
             }
@@ -1530,7 +1519,7 @@ export class GameEngine {
     applySlowArea(primaryTarget, sourceTower) {
         const radius = 2;
         const radiusSq = radius * radius;
-        const slowPct = Math.min(0.95, 0.2 + ((sourceTower.slowPowerLevel || 0) * 0.1));
+        const slowPct = Math.min(0.95, 0.3 + ((sourceTower.slowPowerLevel || 0) * 0.1));
         const slowMult = 1 - slowPct;
 
         for (const mob of this.mobs) {
@@ -1547,11 +1536,13 @@ export class GameEngine {
         const level = sourceTower.bleedLevel || 0;
         if (level <= 0) return;
 
-        const perTick = sourceTower.stats.damage * (0.3 * level);
-        target.bleedMap = target.bleedMap || {};
+        const bleedMult = sourceTower.bleedDamageMult || 1;
+        const duration = sourceTower.bleedDurationOverride || 4;
+        const perTick = sourceTower.stats.damage * (0.3 * level) * bleedMult;
+        target.bleedMap = {};
         target.bleedMap[sourceTower.id] = {
             damagePerTick: perTick,
-            duration: 4,
+            duration,
             tickTimer: 1,
             sourceTowerId: sourceTower.id
         };

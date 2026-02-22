@@ -18,27 +18,30 @@ const UPGRADE_POOL = [
     { id: 'elemental_wood_magic', label: '木元素術式', desc: '基礎傷害轉木傷；觸發龍捲（基礎+20，後續每級+40）', onlyMagic: true, magicElement: 'wood' },
     { id: 'fire_dmg', label: '火屬性附加傷害 +25%', desc: '增加火屬性追加傷害', element: 'fire' },
     { id: 'water_dmg', label: '水屬性附加傷害 +25%', desc: '增加水屬性追加傷害', element: 'water' },
-    { id: 'wood_dmg', label: '木屬性附加傷害 +25%', desc: '增加木屬性追加傷害', element: 'wood' },
+    { id: 'wood_dmg', label: '木屬性附加傷害 +25%', desc: '增加木屬性追加傷害，並附加中毒效果', element: 'wood' },
+    { id: 'poison_dmg', label: '中毒傷害 +40%', desc: '木附傷帶來的中毒每級 +40% 傷害', element: 'wood', maxCount: 3 },
+    { id: 'poison_duration', label: '中毒時間 +2秒', desc: '木附傷帶來的中毒持續時間 +2 秒', element: 'wood', maxCount: 3 },
     { id: 'base_dmg', label: '基礎傷害 +25%', desc: '直接提升基礎傷害' },
     { id: 'crit_chance', label: '暴擊率 +10%', desc: '提高暴擊觸發機率' },
     { id: 'crit_dmg', label: '暴擊傷害 +20%', desc: '提高暴擊倍率' },
     { id: 'speed', label: '攻速 +10%', desc: '縮短攻擊間隔', maxCount: 5 },
     { id: 'range', label: '攻擊距離 +1', desc: '提升攻擊範圍', maxCount: 2 },
-    { id: 'proj_chain_up', label: '連鎖次數 +1', desc: '投射物額外連鎖一次', onlyProjectile: true, maxCount: 2 },
+    { id: 'proj_chain_up', label: '連鎖次數 +1', desc: '投射物額外連鎖一次', onlyProjectile: true, maxCount: 3 },
     { id: 'proj_count_up', label: '攻擊數量 +1', desc: '投射物額外命中目標 +1', onlyProjectile: true, maxCount: 2 },
-    { id: 'melee_bleed', label: '附加流血', desc: '近戰命中後 4 秒流血，每秒 30% 基礎傷害（每級 +30%）', onlyMelee: true },
+    { id: 'melee_bleed', label: '附加流血', desc: '近戰命中後 4 秒流血，每秒 30% 傷害（每級 +30%，不可疊加）', onlyMelee: true },
     { id: 'addition_attack', label: '額外攻擊 +1', desc: '命中時追加 50% 基礎傷害攻擊', onlyMelee: true, maxCount: 3 },
     { id: 'slow_power_up', label: '緩速效果增加 +10%', desc: '緩速塔每級額外 +10% 緩速', onlySlowTower: true, maxCount: 3 },
     { id: 'knockback_up', label: '擊退距離 +0.5', desc: '砲擊塔命中擊退更遠', onlyArtillery: true }
 ];
 
 const SPECIALIZATION_POOL = [
-    { id: 'spec_speed_aura', label: '加速靈氣', desc: '所有塔攻速 +10%', condition: (t) => (t.upgradeStats?.speed || 0) >= 5 },
-    { id: 'spec_fire_global', label: '火之靈氣', desc: '所有塔命中觸發 20% 基礎火傷（2 格）', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 5 },
-    { id: 'spec_water_global', label: '水之靈氣', desc: '所有塔命中 25% 機率暈眩 0.15 秒並附加 50% 基礎水傷', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 5 },
-    { id: 'spec_wood_global', label: '木專精', desc: '所有塔命中附加中毒（每秒 10% 基礎木傷，4 秒，可疊）', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 5 },
-    { id: 'spec_crit_global', label: '暴擊靈氣', desc: '所有塔暴擊機率 +20%', condition: (t) => (t.upgradeStats?.crit_chance || 0) >= 5 },
-    { id: 'spec_crit_dmg_global', label: '暴傷靈氣', desc: '所有塔暴擊傷害 +20%', condition: (t) => (t.upgradeStats?.crit_dmg || 0) >= 5 },
+    { id: 'spec_speed_aura', label: '加速靈氣', desc: '所有塔攻速 +10%', condition: (t) => (t.upgradeStats?.speed || 0) >= 4 },
+    { id: 'spec_fire_global', label: '火之靈氣', desc: '所有塔命中觸發 20% 基礎火傷（2 格）', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 4 },
+    { id: 'spec_water_global', label: '水之靈氣', desc: '所有塔命中 25% 機率暈眩 0.15 秒並附加 50% 基礎水傷', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 4 },
+    { id: 'spec_wood_global', label: '木專精', desc: '所有塔命中附加中毒（每秒 30% 基礎木傷，並延長 5 秒）', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 4 },
+    { id: 'spec_crit_global', label: '暴擊靈氣', desc: '所有塔暴擊機率 +20%', condition: (t) => (t.upgradeStats?.crit_chance || 0) >= 4 },
+    { id: 'spec_crit_dmg_global', label: '暴傷靈氣', desc: '所有塔暴擊傷害 +20%', condition: (t) => (t.upgradeStats?.crit_dmg || 0) >= 4 },
+    { id: 'spec_chain_no_limit', label: '連鎖彈射', desc: '連鎖傷害不衰減，且可重複連鎖已命中目標', condition: (t) => (t.upgradeStats?.proj_chain_up || 0) >= 3 },
     { id: 'spec_tower_speed_50', label: '攻速提升 20%', desc: '該塔攻速提升 20%' },
     { id: 'spec_tower_base_100', label: '基礎傷害提升 100%', desc: '該塔基礎傷害 x2' },
     { id: 'spec_tower_range_3', label: '攻擊範圍 +3', desc: '該塔攻擊範圍 +3 格' },
@@ -47,7 +50,8 @@ const SPECIALIZATION_POOL = [
     { id: 'spec_tower_stun_02', label: '攻擊暈眩', desc: '該塔每次攻擊暈眩 0.2 秒' },
     { id: 'spec_tower_fire_explosion', label: '火焰爆炸', desc: '該塔命中觸發 50% 基礎火焰爆炸（3 格）' },
     { id: 'spec_tower_attr_off_triple', label: '棄屬性強化', desc: '屬性攻擊失效，基礎傷害 x3' },
-    { id: 'spec_tower_half_dmg_double_speed', label: '高速連擊', desc: '基礎傷害減半，攻速翻倍' }
+    { id: 'spec_tower_half_dmg_double_speed', label: '高速連擊', desc: '基礎傷害減半，攻速翻倍' },
+    { id: 'spec_tower_bleed', label: '血蝕之刃', desc: '流血傷害 +200%，流血持續時間改為 10 秒', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 3 }
 ];
 
 const SUPPORT_UPGRADE_POOL = [
@@ -191,11 +195,11 @@ const isSupportTower = (tower) => tower?.type === 'support' || tower?.stats?.typ
 const lerp = (a, b, t) => Math.round(a + (b - a) * t);
 
 const getTowerLevelColor = (level) => {
-    if (level >= 15) return 'rgb(192, 192, 204)';
+    if (level >= 10) return 'rgb(192, 192, 204)';
 
     const start = { r: 255, g: 136, b: 40 }; // orange
     const end = { r: 132, g: 66, b: 186 }; // purple
-    const t = Math.max(0, Math.min(1, (level - 1) / 14));
+    const t = Math.max(0, Math.min(1, (level - 1) / 9));
     return `rgb(${lerp(start.r, end.r, t)}, ${lerp(start.g, end.g, t)}, ${lerp(start.b, end.b, t)})`;
 };
 
@@ -1133,7 +1137,13 @@ const Game = ({ onExit }) => {
             ? (engine?.getSupportAuraStatus?.(selectedTower) || null)
             : null;
 
-        const initialDamage = baseStats.damage || 0;
+        const talentBaseDamageBonus = engine?.getTalentValue?.('tower_dmg_base') || 0;
+        const talentAttrDamageMult = 1 + (engine?.getTalentValue?.('tower_attr_dmg') || 0);
+        const talentSpeedMult = 1 + (engine?.getTalentValue?.('tower_atk_speed') || 0);
+        const displayBaseDamage = selectedTower.equipmentId === 'full_firepower' ? 40 : (baseStats.damage || 0);
+        const displayBaseSpeed = selectedTower.equipmentId === 'lubricant' ? 1 : (baseStats.speed || 0);
+
+        const initialDamage = displayBaseDamage * talentAttrDamageMult + (talentBaseDamageBonus * talentAttrDamageMult);
         const currentBaseDamage = selectedTower.stats?.damage || 0;
         const bonusBaseDamage = Math.max(0, currentBaseDamage - initialDamage);
 
@@ -1148,7 +1158,7 @@ const Game = ({ onExit }) => {
         const currentCritDmg = selectedTower.stats?.critDmg || INITIAL_CRIT_DMG;
         const extraCritDmg = currentCritDmg - INITIAL_CRIT_DMG;
 
-        const initialSpeed = baseStats.speed || 0;
+        const initialSpeed = displayBaseSpeed * talentSpeedMult;
         const currentSpeed = selectedTower.stats?.speed || 0;
         const extraSpeed = currentSpeed - initialSpeed;
 

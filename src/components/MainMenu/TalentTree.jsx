@@ -18,32 +18,25 @@ const RESOURCE_LABELS = {
 };
 
 const TALENT_CATEGORIES = [
-    { id: 'level', title: '關卡設定', talentIds: ['initial_gold', 'player_max_hp', 'mob_hp_drop', 'mob_density', 'item_drop_rate'] },
-    { id: 'melee', title: '近戰塔特性', talentIds: ['melee_tower_dmg_base', 'melee_tower_attr_dmg', 'melee_tower_crit_chance', 'melee_tower_atk_speed', 'melee_tower_range'] },
-    { id: 'range', title: '遠程塔特性', talentIds: ['range_tower_dmg_base', 'range_tower_attr_dmg', 'range_tower_atk_speed', 'range_tower_crit_chance', 'range_tower_chain', 'range_tower_proj_count', 'range_tower_range'] },
-    { id: 'spell', title: '法術塔特性', talentIds: ['spell_tower_dmg_base', 'spell_tower_atk_speed', 'spell_tower_range'] }
+    { id: 'economy', title: 'Economy', talentIds: ['initial_gold', 'player_max_hp'] },
+    { id: 'damage', title: 'Tower Damage', talentIds: ['tower_dmg_base', 'tower_attr_dmg', 'tower_crit_chance'] },
+    { id: 'attack_pattern', title: 'Attack Pattern', talentIds: ['tower_proj_count', 'tower_chain', 'tower_aoe_range'] },
+    { id: 'tempo', title: 'Tempo and Coverage', talentIds: ['tower_atk_speed', 'tower_range', 'game_speed'] },
+    { id: 'level', title: 'Level Rules', talentIds: ['mob_hp_drop', 'mob_density'] }
 ];
 
 const getTalent = (talentId) => Object.values(TALENTS).find((talent) => talent.id === talentId);
 
 const formatTalentEffect = (talentId, perLevel) => {
-    if (talentId === 'range_tower_proj_count') return `每級 +${perLevel} 額外攻擊目標`;
-    if (talentId === 'range_tower_chain') return `每級 +${perLevel} 連鎖次數`;
-    if (talentId === 'melee_tower_range' || talentId === 'range_tower_range' || talentId === 'spell_tower_range') return `每級 +${perLevel} 格`;
+    if (talentId === 'tower_proj_count') return `Per level +${perLevel} extra targets`;
+    if (talentId === 'tower_chain') return `Per level +${perLevel} chain jumps`;
+    if (talentId === 'tower_range' || talentId === 'tower_aoe_range') return `Per level +${perLevel} tiles`;
     if (talentId === 'initial_gold') return `Per level +${perLevel} gold`;
     if (talentId === 'player_max_hp') return `Per level +${perLevel} max HP`;
-    if (talentId === 'mob_hp_drop') return '每級 +30% 怪物血量，+10% 資源掉落';
-    if (talentId === 'mob_density') return '每級 怪物數量 x2（波次時間不變）';
-    if (talentId === 'item_drop_rate') return `每級 +${Math.floor(perLevel * 100)}% 道具掉落率`;
-    if (
-        talentId === 'melee_tower_attr_dmg'
-        || talentId === 'range_tower_attr_dmg'
-        || talentId === 'melee_tower_atk_speed'
-        || talentId === 'range_tower_atk_speed'
-        || talentId === 'spell_tower_atk_speed'
-        || talentId === 'melee_tower_crit_chance'
-        || talentId === 'range_tower_crit_chance'
-    ) {
+    if (talentId === 'mob_hp_drop') return 'Per level +30% mob HP, +10% resource drop';
+    if (talentId === 'mob_density') return 'Per level x2 mob count, same wave duration';
+    if (talentId === 'game_speed') return `Per level +${perLevel.toFixed(2)}x game speed (max x2.00)`;
+    if (talentId === 'tower_attr_dmg' || talentId === 'tower_atk_speed' || talentId === 'tower_crit_chance' || talentId === 'mob_hp_drop' || talentId === 'mob_density') {
         return `Per level +${Math.floor(perLevel * 100)}%`;
     }
     return `Per level +${perLevel}`;

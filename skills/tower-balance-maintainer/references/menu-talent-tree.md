@@ -2,53 +2,49 @@
 
 ## 位置與用途
 
-- UI 檔案：`src/components/MainMenu/TalentTree.jsx`
-- 天賦定義來源：`src/data/constants.js` 的 `TALENTS`
-- 遊戲內實際效果套用：
-  - 塔屬性與初始值：`src/engine/GameEngine.js`
-  - 關卡/怪物倍率：`src/engine/GameEngine.js`
-  - 遊戲速度上限與調速：`src/engine/GameEngine.js` + `src/components/Game/Game.jsx`
+- UI：`src/components/MainMenu/TalentTree.jsx`
+- 天賦定義：`src/data/constants.js` 的 `TALENTS`
+- 實際套用：`src/engine/GameEngine.js`
 
-## 分類
+## 分類（目前實作）
 
-1. `關卡設定` (使用energy)
-- `initial_gold` 初始金幣
-- `player_max_hp` 提升玩家最大生命
-- `mob_hp_drop` 增加怪物血量與資源掉落
-- `mob_density` 增加怪物密集度
-- `item_drop_rate` 增加道具掉落機率
+1. `Economy`
+- `initial_gold`
+- `player_max_hp`
 
-2. `近戰塔特性` (使用wood)
-- `melee_tower_dmg_base` 增加塔基礎傷害
-- `melee_tower_attr_dmg` 增加塔屬性傷害
-- `melee_tower_crit_chance` 增加暴擊機率
-- `melee_tower_atk_speed` 增加塔攻擊速度
-- `melee_tower_range` 增加塔攻擊距離
+2. `Tower Damage`
+- `tower_dmg_base`
+- `tower_attr_dmg`
+- `tower_crit_chance`
 
-3. `遠程塔特性` (使用ore)
-- `range_tower_dmg_base` 增加塔基礎傷害
-- `range_tower_attr_dmg` 增加塔屬性傷害
-- `range_tower_atk_speed` 增加塔攻擊速度
-- `range_tower_crit_chance` 增加暴擊機率
-- `range_tower_chain` 增加投射物連鎖次數
-- `range_tower_proj_count` 增加攻擊數量
-- `range_tower_range` 增加塔攻擊距離
+3. `Attack Pattern`
+- `tower_proj_count`
+- `tower_chain`
+- `tower_aoe_range`（目前僅常數與 UI，尚未在引擎套用）
 
-4. `法術塔特性` (使用water)
-- `spell_tower_dmg_base` 增加塔基礎傷害
-- `spell_tower_atk_speed` 增加塔攻擊速度
-- `spell_tower_range` 增加塔攻擊距離
+4. `Tempo and Coverage`
+- `tower_atk_speed`
+- `tower_range`
+- `game_speed`
+
+5. `Level Rules`
+- `mob_hp_drop`
+- `mob_density`
 
 ## 成本與等級規則
 
-- 升級成本公式：`floor(baseCost * 1.5^目前等級)`
-- 退還公式：退還上一級成本（同一公式的前一階）
-- 資源種類：`energy / wood / ore / water`
+- 升級成本：`floor(baseCost * 1.5^目前等級)`
+- 退還：退還上一級成本（同公式前一階）
+- 資源：`energy / wood / ore / water`
+
+## 遊戲速度規則
+
+- `game_speed` 每級 `+0.25x`，最高 4 級（上限 `x2.00`）
+- 關卡內速度可調範圍：`x1.00 ~ x2.00`
+- 調速步進：`0.25`
 
 ## UI 注意事項
 
-- 卡片操作按鈕為雙欄，需使用 `minmax(0, 1fr)` 防止內容把欄位撐爆。
-- 按鈕內容（文字、圖示、數值）需 `minWidth: 0` 並限制在卡片內，避免跨卡片溢出。
-- 長文案需可斷行（`overflowWrap: anywhere`），避免在窄欄位下超出框線。
-- 遊戲內調速步進：`0.25`
-- 遊戲內調速範圍：`x1.00` 到上限（`x2.00`）
+- 卡片按鈕雙欄採 `minmax(0, 1fr)`，避免內容撐爆。
+- 按鈕內容使用 `minWidth: 0` 並限制在卡片內。
+- 長文案使用 `overflowWrap: anywhere`。

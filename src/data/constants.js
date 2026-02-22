@@ -58,33 +58,24 @@ export const TOWER_TYPES = {
 };
 
 export const TALENTS = {
-  // Level and economy stats (energy)
+  // Player stats
   INITIAL_GOLD: { id: 'initial_gold', name: '初始金幣', costType: RESOURCES.ENERGY, baseCost: 10, perLevel: 50 },
-  PLAYER_MAX_HP: { id: 'player_max_hp', name: '提升玩家最大生命', costType: RESOURCES.ENERGY, baseCost: 25, perLevel: 1 },
+  PLAYER_MAX_HP: { id: 'player_max_hp', name: '提升玩家最大生命', costType: RESOURCES.WATER, baseCost: 25, perLevel: 1 },
+
+  // Tower stats
+  TOWER_DMG_BASE: { id: 'tower_dmg_base', name: '增加塔基礎傷害', costType: RESOURCES.ORE, baseCost: 10, perLevel: 1 },
+  TOWER_ATTR_DMG: { id: 'tower_attr_dmg', name: '增加塔屬性傷害', costType: RESOURCES.ORE, baseCost: 15, perLevel: 0.1 },
+  TOWER_ATK_SPEED: { id: 'tower_atk_speed', name: '增加塔攻擊速度', costType: RESOURCES.WOOD, baseCost: 10, perLevel: 0.05 },
+  TOWER_RANGE: { id: 'tower_range', name: '增加塔攻擊距離', costType: RESOURCES.WOOD, baseCost: 10, perLevel: 0.5 },
+  TOWER_AOE_RANGE: { id: 'tower_aoe_range', name: '增加範圍效果距離', costType: RESOURCES.WATER, baseCost: 15, perLevel: 0.5 },
+  TOWER_PROJ_COUNT: { id: 'tower_proj_count', name: '增加攻擊數量', costType: RESOURCES.WOOD, baseCost: 50, perLevel: 1 },
+  TOWER_CRIT_CHANCE: { id: 'tower_crit_chance', name: '增加暴擊機率', costType: RESOURCES.ORE, baseCost: 20, perLevel: 0.05 },
+  TOWER_CHAIN: { id: 'tower_chain', name: '增加投射物連鎖次數', costType: RESOURCES.WATER, baseCost: 40, perLevel: 1 },
+
+  // Level stats
   MOB_HP_DROP: { id: 'mob_hp_drop', name: '增加怪物血量與資源掉落', costType: RESOURCES.ENERGY, baseCost: 10, perLevel: 0.3, dropPerLevel: 0.1 },
   MOB_DENSITY: { id: 'mob_density', name: '增加怪物密集度', costType: RESOURCES.ENERGY, baseCost: 20, perLevel: 1 },
-  ITEM_DROP_RATE: { id: 'item_drop_rate', name: '增加道具掉落機率', costType: RESOURCES.ENERGY, baseCost: 20, perLevel: 0.1 },
-
-  // Melee tower stats (wood)
-  MELEE_TOWER_DMG_BASE: { id: 'melee_tower_dmg_base', name: '近戰塔基礎傷害', costType: RESOURCES.WOOD, baseCost: 10, perLevel: 1 },
-  MELEE_TOWER_ATTR_DMG: { id: 'melee_tower_attr_dmg', name: '近戰塔屬性傷害', costType: RESOURCES.WOOD, baseCost: 15, perLevel: 0.1 },
-  MELEE_TOWER_CRIT_CHANCE: { id: 'melee_tower_crit_chance', name: '近戰塔暴擊機率', costType: RESOURCES.WOOD, baseCost: 20, perLevel: 0.05 },
-  MELEE_TOWER_ATK_SPEED: { id: 'melee_tower_atk_speed', name: '近戰塔攻擊速度', costType: RESOURCES.WOOD, baseCost: 10, perLevel: 0.05 },
-  MELEE_TOWER_RANGE: { id: 'melee_tower_range', name: '近戰塔攻擊距離', costType: RESOURCES.WOOD, baseCost: 10, perLevel: 0.5 },
-
-  // Range tower stats (ore)
-  RANGE_TOWER_DMG_BASE: { id: 'range_tower_dmg_base', name: '遠程塔基礎傷害', costType: RESOURCES.ORE, baseCost: 10, perLevel: 1 },
-  RANGE_TOWER_ATTR_DMG: { id: 'range_tower_attr_dmg', name: '遠程塔屬性傷害', costType: RESOURCES.ORE, baseCost: 15, perLevel: 0.1 },
-  RANGE_TOWER_ATK_SPEED: { id: 'range_tower_atk_speed', name: '遠程塔攻擊速度', costType: RESOURCES.ORE, baseCost: 10, perLevel: 0.05 },
-  RANGE_TOWER_CRIT_CHANCE: { id: 'range_tower_crit_chance', name: '遠程塔暴擊機率', costType: RESOURCES.ORE, baseCost: 20, perLevel: 0.05 },
-  RANGE_TOWER_CHAIN: { id: 'range_tower_chain', name: '遠程塔連鎖次數', costType: RESOURCES.ORE, baseCost: 40, perLevel: 1 },
-  RANGE_TOWER_PROJ_COUNT: { id: 'range_tower_proj_count', name: '遠程塔攻擊數量', costType: RESOURCES.ORE, baseCost: 50, perLevel: 1 },
-  RANGE_TOWER_RANGE: { id: 'range_tower_range', name: '遠程塔攻擊距離', costType: RESOURCES.ORE, baseCost: 10, perLevel: 0.5 },
-
-  // Spell tower stats (water)
-  SPELL_TOWER_DMG_BASE: { id: 'spell_tower_dmg_base', name: '法術塔基礎傷害', costType: RESOURCES.WATER, baseCost: 10, perLevel: 1 },
-  SPELL_TOWER_ATK_SPEED: { id: 'spell_tower_atk_speed', name: '法術塔攻擊速度', costType: RESOURCES.WATER, baseCost: 10, perLevel: 0.05 },
-  SPELL_TOWER_RANGE: { id: 'spell_tower_range', name: '法術塔攻擊距離', costType: RESOURCES.WATER, baseCost: 10, perLevel: 0.5 },
+  GAME_SPEED: { id: 'game_speed', name: '增加遊戲速度', costType: RESOURCES.WATER, baseCost: 35, perLevel: 0.25, maxLevel: 4 },
 };
 
 export const WAVE_CONFIG = [
