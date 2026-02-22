@@ -9,7 +9,7 @@ function App() {
 
   return (
     <GameProvider>
-      <div className="app-container">
+      <div className={`app-container ${inGame ? 'in-game' : ''}`}>
         {inGame ? (
           <Game onExit={() => setInGame(false)} />
         ) : (
