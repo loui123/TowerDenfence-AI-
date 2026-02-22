@@ -7,9 +7,10 @@ const GameContext = createContext();
 const INITIAL_STATE = {
     resources: {
         [RESOURCES.ENERGY]: 0,
-        [RESOURCES.WOOD]: 0,
-        [RESOURCES.ORE]: 0,
-        [RESOURCES.WATER]: 0,
+        [RESOURCES.RED_CRYSTAL]: 0,
+        [RESOURCES.GREEN_GEM]: 0,
+        [RESOURCES.BLUE_CRYSTAL]: 0,
+        [RESOURCES.GOLD_ORE]: 0,
     },
     talents: {} // id: level
 };
@@ -18,7 +19,15 @@ export const GameProvider = ({ children }) => {
     const [saveData, setSaveData] = useState(() => {
         try {
             const saved = localStorage.getItem('rogue_td_save');
-            return saved ? JSON.parse(saved) : INITIAL_STATE;
+            const parsed = saved ? JSON.parse(saved) : INITIAL_STATE;
+            return {
+                ...INITIAL_STATE,
+                ...parsed,
+                resources: {
+                    ...INITIAL_STATE.resources,
+                    ...(parsed?.resources || {})
+                }
+            };
         } catch {
             return INITIAL_STATE;
         }
@@ -33,7 +42,7 @@ export const GameProvider = ({ children }) => {
             ...prev,
             resources: {
                 ...prev.resources,
-                [type]: Math.floor(prev.resources[type] + amount)
+                [type]: Math.floor((prev.resources[type] || 0) + amount)
             }
         }));
     };
@@ -48,7 +57,7 @@ export const GameProvider = ({ children }) => {
         if (talent.maxLevel !== undefined && level >= talent.maxLevel) return false;
         // Simple cost formula: base * (level + 1)
         const cost = Math.floor(talent.baseCost * Math.pow(1.5, level));
-        return saveData.resources[talent.costType] >= cost;
+        return (saveData.resources[talent.costType] || 0) >= cost;
     };
 
     const getTalentCost = (talentId) => {
@@ -69,9 +78,9 @@ export const GameProvider = ({ children }) => {
         setSaveData(prev => ({
             ...prev,
             resources: {
-                ...prev.resources,
-                [talent.costType]: prev.resources[talent.costType] - cost
-            },
+                    ...prev.resources,
+                    [talent.costType]: (prev.resources[talent.costType] || 0) - cost
+                },
             talents: {
                 ...prev.talents,
                 [talentId]: (prev.talents[talentId] || 0) + 1
@@ -115,7 +124,7 @@ export const GameProvider = ({ children }) => {
                 ...prev,
                 resources: {
                     ...prev.resources,
-                    [talent.costType]: prev.resources[talent.costType] + refund
+                    [talent.costType]: (prev.resources[talent.costType] || 0) + refund
                 },
                 talents: nextTalents
             };
@@ -128,7 +137,13 @@ export const GameProvider = ({ children }) => {
     const debugAddResources = () => {
         setSaveData(prev => ({
             ...prev,
-            resources: { energy: 1000, wood: 1000, ore: 1000, water: 1000 }
+            resources: {
+                energy: 1000,
+                red_crystal: 1000,
+                green_gem: 1000,
+                blue_crystal: 1000,
+                gold_ore: 1000
+            }
         }));
     };
 

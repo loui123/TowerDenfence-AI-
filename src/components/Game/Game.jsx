@@ -21,17 +21,20 @@ const UPGRADE_POOL = [
     { id: 'wood_dmg', label: '木屬性附加傷害 +25%', desc: '增加木屬性追加傷害，並附加中毒效果', element: 'wood' },
     { id: 'poison_dmg', label: '中毒傷害 +40%', desc: '木附傷帶來的中毒每級 +40% 傷害', element: 'wood', maxCount: 3 },
     { id: 'poison_duration', label: '中毒時間 +2秒', desc: '木附傷帶來的中毒持續時間 +2 秒', element: 'wood', maxCount: 3 },
+    { id: 'poison_frequency', label: '中毒頻率 +10%', desc: '木附傷帶來的中毒傷害頻率每級 +10%', element: 'wood' },
     { id: 'base_dmg', label: '基礎傷害 +25%', desc: '直接提升基礎傷害' },
     { id: 'crit_chance', label: '暴擊率 +10%', desc: '提高暴擊觸發機率' },
     { id: 'crit_dmg', label: '暴擊傷害 +20%', desc: '提高暴擊倍率' },
-    { id: 'speed', label: '攻速 +10%', desc: '縮短攻擊間隔', maxCount: 5 },
-    { id: 'range', label: '攻擊距離 +1', desc: '提升攻擊範圍', maxCount: 2 },
-    { id: 'proj_chain_up', label: '連鎖次數 +1', desc: '投射物額外連鎖一次', onlyProjectile: true, maxCount: 3 },
+    { id: 'speed', label: '攻速 +10%', desc: '縮短攻擊間隔', maxCount: 4 },
+    { id: 'range', label: '攻擊距離 +1', desc: '提升攻擊範圍', maxCount: 4 },
+    { id: 'proj_chain_up', label: '連鎖次數 +1', desc: '投射物額外連鎖一次', onlyProjectile: true, maxCount: 4 },
     { id: 'proj_count_up', label: '攻擊數量 +1', desc: '投射物額外命中目標 +1', onlyProjectile: true, maxCount: 2 },
     { id: 'melee_bleed', label: '附加流血', desc: '近戰命中後 4 秒流血，每秒 30% 傷害（每級 +30%，不可疊加）', onlyMelee: true },
     { id: 'addition_attack', label: '額外攻擊 +1', desc: '命中時追加 50% 基礎傷害攻擊', onlyMelee: true, maxCount: 3 },
     { id: 'slow_power_up', label: '緩速效果增加 +10%', desc: '緩速塔每級額外 +10% 緩速', onlySlowTower: true, maxCount: 3 },
-    { id: 'knockback_up', label: '擊退距離 +0.5', desc: '砲擊塔命中擊退更遠', onlyArtillery: true }
+    { id: 'knockback_up', label: '攻擊爆炸擊退距離 +0.5', desc: '砲擊塔爆炸命中擊退更遠', onlyArtillery: true },
+    { id: 'knockback_stun', label: '爆炸暈眩 +0.2秒', desc: '砲擊塔爆炸附加 0.2 秒暈眩', onlyArtillery: true },
+    { id: 'knockback_radius', label: '爆炸範圍 +1', desc: '砲擊塔爆炸範圍增加 1 格', onlyArtillery: true }
 ];
 
 const SPECIALIZATION_POOL = [
@@ -51,7 +54,9 @@ const SPECIALIZATION_POOL = [
     { id: 'spec_tower_fire_explosion', label: '火焰爆炸', desc: '該塔命中觸發 50% 基礎火焰爆炸（3 格）' },
     { id: 'spec_tower_attr_off_triple', label: '棄屬性強化', desc: '屬性攻擊失效，基礎傷害 x3' },
     { id: 'spec_tower_half_dmg_double_speed', label: '高速連擊', desc: '基礎傷害減半，攻速翻倍' },
-    { id: 'spec_tower_bleed', label: '血蝕之刃', desc: '流血傷害 +200%，流血持續時間改為 10 秒', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 3 }
+    { id: 'spec_tower_bleed', label: '血蝕之刃', desc: '流血傷害 +200%，流血持續時間改為 10 秒', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 3 },
+    { id: 'spec_tower_poison', label: '毒蝕蔓延', desc: '所有塔中毒傷害 +200%、中毒持續至少 10 秒，並附加 15% 緩速', condition: (t) => (t.upgradeStats?.poison_dmg || 0) >= 3 },
+    { id: 'spec_tower_poison_frequency', label: '劇毒高頻', desc: '所有塔中毒頻率 +200%，並附加 15% 緩速', condition: (t) => (t.upgradeStats?.poison_frequency || 0) >= 3 }
 ];
 
 const SUPPORT_UPGRADE_POOL = [
@@ -122,7 +127,7 @@ const TERRAIN_META = {
     },
     ruins: {
         name: '遺跡',
-        description: '無額外效果',
+        description: '法術塔攻速 +20%，輔助塔靈氣範圍 +1',
         image: 'linear-gradient(120deg, rgba(150,130,100,0.2), rgba(90,80,70,0.1))'
     }
 };
@@ -169,6 +174,56 @@ const getTowerName = (typeId) => {
     if (typeId === 'magic') return '法術塔';
     if (typeId === 'support') return '輔助塔';
     return '塔';
+};
+const getTowerArchetypeLabel = (type) => {
+    if (type?.stats?.type === 'magic') return '法術';
+    if (type?.stats?.type === 'support') return '輔助';
+    if (type?.stats?.type === 'projectile') return '投射物';
+    return '近戰';
+};
+
+const getBuildPanelLines = (type) => {
+    if (!type) return [];
+    const baseLine = `花費: ${type.cost} | 型態: ${getTowerArchetypeLabel(type)}`;
+    const statLineA = `傷害: ${type.stats.damage} | 攻速: ${type.stats.speed.toFixed(2)}`;
+    const statLineB = `距離: ${type.stats.range} | 暴擊: ${(type.stats.crit * 100).toFixed(0)}%`;
+
+    if (type.id === 'support') {
+        return [
+            baseLine,
+            '定位: 輔助靈氣塔(無法攻擊)附近1格友方塔+15%'
+        ];
+    }
+
+    if (type.id === 'projectile_slow') {
+        return [
+            baseLine,
+            statLineA,
+            statLineB,
+            '定位: 遠距離範圍控場 具備緩速能力',
+            '基礎緩速: 30%（可透過天賦持續強化）'
+        ];
+    }
+
+    if (type.id === 'projectile_aoe') {
+        return [
+            baseLine,
+            statLineA,
+            statLineB,
+            '定位: 遠距離範圍控場 具備擊退能力'
+        ];
+    }
+
+    if (type.id === 'magic') {
+        return [
+            baseLine,
+            statLineA,
+            statLineB,
+            '定位: 攻擊機率觸發法術'
+        ];
+    }
+
+    return [baseLine, statLineA, statLineB];
 };
 const TERRAIN_TILE_MAP = {
     highland: '/tiles/terrain_highland.svg',
@@ -520,11 +575,11 @@ const Game = ({ onExit }) => {
             onVictory: () => {
                 triggerSfx('victory');
                 if (!crystalGrantedRef.current) {
-                    addResource(RESOURCES.WATER, 1);
+                    addResource(RESOURCES.BLUE_CRYSTAL, 1);
                     crystalGrantedRef.current = true;
                 }
 
-                const continuePlay = window.confirm('已完成第10關，獲得 1 水晶。按「確定」繼續遊玩（後續不再獲得水晶），按「取消」返回主選單。');
+                const continuePlay = window.confirm('已完成第10關，獲得 1 藍水晶。按「確定」繼續遊玩（後續不再獲得藍水晶），按「取消」返回主選單。');
                 if (!continuePlay) {
                     engine.stop();
                     onExit();
@@ -898,6 +953,8 @@ const Game = ({ onExit }) => {
             if (option.id === 'spec_wood_global' && globalMasteries.woodMastery) return false;
             if (option.id === 'spec_crit_global' && globalMasteries.critAura) return false;
             if (option.id === 'spec_crit_dmg_global' && globalMasteries.critDmgAura) return false;
+            if (option.id === 'spec_tower_poison' && globalMasteries.poisonMastery) return false;
+            if (option.id === 'spec_tower_poison_frequency' && globalMasteries.poisonFrequencyMastery) return false;
             if (option.condition && !option.condition(tower)) return false;
             return true;
         });
@@ -1137,9 +1194,16 @@ const Game = ({ onExit }) => {
             ? (engine?.getSupportAuraStatus?.(selectedTower) || null)
             : null;
 
-        const talentBaseDamageBonus = engine?.getTalentValue?.('tower_dmg_base') || 0;
-        const talentAttrDamageMult = 1 + (engine?.getTalentValue?.('tower_attr_dmg') || 0);
-        const talentSpeedMult = 1 + (engine?.getTalentValue?.('tower_atk_speed') || 0);
+        const towerTalentMods = engine?.getTowerTalentModifiersForType?.(selectedTower.type) || {
+            baseDamageBonus: 0,
+            attrDamageMult: 1,
+            speedMult: 1,
+            rangeBonus: 0,
+            critBonus: 0
+        };
+        const talentBaseDamageBonus = towerTalentMods.baseDamageBonus || 0;
+        const talentAttrDamageMult = towerTalentMods.attrDamageMult || 1;
+        const talentSpeedMult = towerTalentMods.speedMult || 1;
         const displayBaseDamage = selectedTower.equipmentId === 'full_firepower' ? 40 : (baseStats.damage || 0);
         const displayBaseSpeed = selectedTower.equipmentId === 'lubricant' ? 1 : (baseStats.speed || 0);
 
@@ -1151,7 +1215,7 @@ const Game = ({ onExit }) => {
         const extraWater = selectedTower.stats?.extraWater || 0;
         const extraWood = selectedTower.stats?.extraWood || 0;
 
-        const initialCrit = (baseStats.crit || 0) * 100;
+        const initialCrit = ((baseStats.crit || 0) + (towerTalentMods.critBonus || 0)) * 100;
         const currentCrit = (selectedTower.stats?.crit || 0) * 100;
         const extraCrit = currentCrit - initialCrit;
 
@@ -1162,7 +1226,7 @@ const Game = ({ onExit }) => {
         const currentSpeed = selectedTower.stats?.speed || 0;
         const extraSpeed = currentSpeed - initialSpeed;
 
-        const initialRange = baseStats.range || 0;
+        const initialRange = (baseStats.range || 0) + (towerTalentMods.rangeBonus || 0);
         const currentRange = selectedTower.stats?.range || 0;
         const extraRange = currentRange - initialRange;
 
@@ -1230,6 +1294,8 @@ const Game = ({ onExit }) => {
             const cfg = engine.getWaveConfig(gameState.wave);
             const density = engine.getMobDensityMultiplier();
             const hp = 10 * gameState.wave * engine.getMobHpMultiplier() * engine.getWaveHpScale(gameState.wave);
+            const affixes = engine.getWaveAffixes ? engine.getWaveAffixes(gameState.wave) : [];
+            const speedUp = affixes.find((a) => a.id === 'move_speed_up')?.value || 0;
             return {
                 type: cfg.type,
                 spawnTarget: Math.max(1, Math.floor(cfg.count * density)),
@@ -1238,8 +1304,9 @@ const Game = ({ onExit }) => {
                 alive: engine.mobs.length || 0,
                 hpScale: engine.getWaveHpScale(gameState.wave),
                 hp: Math.floor(hp),
-                speed: 2.0,
-                image: getMobImage(cfg.type)
+                speed: 2.0 * (1 + speedUp),
+                image: getMobImage(cfg.type),
+                affixes
             };
         })()
         : null;
@@ -1250,6 +1317,8 @@ const Game = ({ onExit }) => {
             const cfg = engine.getWaveConfig(nextWave);
             const density = engine.getMobDensityMultiplier();
             const hp = 10 * nextWave * engine.getMobHpMultiplier() * engine.getWaveHpScale(nextWave);
+            const affixes = engine.getWaveAffixes ? engine.getWaveAffixes(nextWave) : [];
+            const speedUp = affixes.find((a) => a.id === 'move_speed_up')?.value || 0;
             return {
                 wave: nextWave,
                 type: cfg.type,
@@ -1257,8 +1326,9 @@ const Game = ({ onExit }) => {
                 bossCount: 1,
                 hpScale: engine.getWaveHpScale(nextWave),
                 hp: Math.floor(hp),
-                speed: 2.0,
-                image: getMobImage(cfg.type)
+                speed: 2.0 * (1 + speedUp),
+                image: getMobImage(cfg.type),
+                affixes
             };
         })()
         : null;
@@ -1359,16 +1429,17 @@ const Game = ({ onExit }) => {
                             onClick={() => changeGameSpeed(1)}
                             disabled={gameState.gameSpeed >= gameState.gameSpeedCap}
                             style={{ padding: '1px 6px', lineHeight: 1, opacity: gameState.gameSpeed >= gameState.gameSpeedCap ? 0.45 : 1 }}
-                            title={gameState.gameSpeedCap > 2 ? '提高遊戲速度' : '需先在主選單升級遊戲速度天賦'}
+                            title="提高遊戲速度"
                         >
                             +
                         </button>
                         <span style={{ color: '#7aa8d8', fontSize: '0.85em' }}>上限 x{gameState.gameSpeedCap.toFixed(2)}</span>
                     </span>
-                    <span style={{ color: '#9ee493' }}>能量: {resources.energy}</span>
-                    <span style={{ color: '#86c5ff' }}>木材: {resources.wood}</span>
-                    <span style={{ color: '#ffb36a' }}>礦石: {resources.ore}</span>
-                    <span style={{ color: '#79b8ff' }}>水晶: {resources.water}</span>
+                    <span style={{ color: '#9ee493' }}>能量: {resources.energy || 0}</span>
+                    <span style={{ color: '#ff7f7f' }}>紅水晶: {resources.red_crystal || 0}</span>
+                    <span style={{ color: '#67d39a' }}>綠寶石: {resources.green_gem || 0}</span>
+                    <span style={{ color: '#79b8ff' }}>藍水晶: {resources.blue_crystal || 0}</span>
+                    <span style={{ color: '#f5c451' }}>金礦: {resources.gold_ore || 0}</span>
 
                     {!gameState.waveActive && !gameOver && (
                         <button onClick={handleStartWave} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'green', border: 'none' }}>
@@ -1686,23 +1757,24 @@ const Game = ({ onExit }) => {
                     {buildTarget && (
                         <div style={{
                             position: 'absolute',
-                            top: '50px',
-                            left: '50px',
-                            right: '50px',
-                            bottom: '50px',
+                            top: '24px',
+                            left: '24px',
+                            right: '24px',
+                            bottom: '24px',
                             background: '#222',
                             border: '2px solid #66ccff',
                             padding: '14px',
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '8px',
+                            overflow: 'hidden',
                             zIndex: 20
                         }}>
                             <h3>選擇要建造的塔</h3>
                             <div style={{ color: '#cde8ff', textAlign: 'left' }}>
                                 地形: {getTerrainLabel(buildCell?.terrain)} | 效果: {getTerrainEffectText(buildCell?.terrain)}
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoRows: '1fr', gap: '8px', flex: 1, minHeight: 0 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoRows: '1fr', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '2px' }}>
                                 {Object.values(TOWER_TYPES).map((type) => (
                                     <button
                                         key={type.id}
@@ -1722,15 +1794,17 @@ const Game = ({ onExit }) => {
                                         }}
                                     >
                                     <div style={{ fontWeight: 700 }}>{getTowerLabel(type.id)} 塔</div>
-                                    <div>
-                                        花費: {type.cost} | 型態: {type.stats.type === 'projectile' ? '投射物' : (type.stats.type === 'magic' ? '法術' : (type.stats.type === 'support' ? '輔助' : '近戰'))}
-                                    </div>
-                                        <div style={{ color: '#cfd6df' }}>傷害: {type.stats.damage} | 攻速: {type.stats.speed.toFixed(2)}</div>
-                                        <div style={{ color: '#cfd6df' }}>距離: {type.stats.range} | 暴擊: {(type.stats.crit * 100).toFixed(0)}%</div>
+                                        {getBuildPanelLines(type).map((line, idx) => (
+                                            <div key={`${type.id}-line-${idx}`} style={{ color: idx === 0 ? '#ffffff' : '#cfd6df' }}>
+                                                {line}
+                                            </div>
+                                        ))}
                                     </button>
                                 ))}
                             </div>
-                            <button onClick={() => setBuildTarget(null)} style={{ alignSelf: 'flex-end' }}>取消</button>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '2px' }}>
+                                <button onClick={() => setBuildTarget(null)}>取消</button>
+                            </div>
                         </div>
                     )}
 
@@ -1967,6 +2041,14 @@ const Game = ({ onExit }) => {
                                     <div>已出怪數: {waveInfo.spawned}</div>
                                     <div>場上存活: {waveInfo.alive}</div>
                                     <div>關卡血量倍率: x{waveInfo.hpScale.toFixed(2)}</div>
+                                    <div style={{ marginTop: '6px', color: '#f7d9a7' }}>
+                                        詞墜: {waveInfo.affixes?.length ? waveInfo.affixes.map((a) => a.name).join('、') : '無'}
+                                    </div>
+                                    {waveInfo.affixes?.length > 0 && (
+                                        <div style={{ color: '#c2d6e8', fontSize: '0.82rem' }}>
+                                            {waveInfo.affixes.map((a) => a.desc).join(' / ')}
+                                        </div>
+                                    )}
                                 </div>
                                 {nextWaveInfo && (
                                     <div style={{ minWidth: 0, borderLeft: '1px solid #2f2f2f', paddingLeft: '10px' }}>
@@ -1981,6 +2063,14 @@ const Game = ({ onExit }) => {
                                         <div>目標出怪數: {nextWaveInfo.spawnTarget}</div>
                                         <div>波尾 Boss: {nextWaveInfo.bossCount}</div>
                                         <div>關卡血量倍率: x{nextWaveInfo.hpScale.toFixed(2)}</div>
+                                        <div style={{ marginTop: '6px', color: '#f7d9a7' }}>
+                                            詞墜: {nextWaveInfo.affixes?.length ? nextWaveInfo.affixes.map((a) => a.name).join('、') : '無'}
+                                        </div>
+                                        {nextWaveInfo.affixes?.length > 0 && (
+                                            <div style={{ color: '#c2d6e8', fontSize: '0.82rem' }}>
+                                                {nextWaveInfo.affixes.map((a) => a.desc).join(' / ')}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -2128,6 +2218,7 @@ const Game = ({ onExit }) => {
                                 <div>
                                     <div>波數 {gameState.wave} | 類型 {waveInfo.type} | 血量 {waveInfo.hp}</div>
                                     <div>出怪 {waveInfo.spawned}/{waveInfo.spawnTarget} | Boss 1 | 場上 {waveInfo.alive}</div>
+                                    <div>詞墜 {waveInfo.affixes?.length ? waveInfo.affixes.map((a) => a.name).join('、') : '無'}</div>
                                     {nextWaveInfo && <div>下波 {nextWaveInfo.type} | HP {nextWaveInfo.hp} | 目標 {nextWaveInfo.spawnTarget} | Boss 1</div>}
                                 </div>
                             )}
