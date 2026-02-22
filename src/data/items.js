@@ -36,6 +36,14 @@ export const ITEM_DEFS = {
         icon: '暴',
         source: 'all'
     },
+    build_book: {
+        id: 'build_book',
+        name: '建設之書',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '本局可建塔上限 +1',
+        icon: '建',
+        source: 'boss'
+    },
     lubricant: {
         id: 'lubricant',
         name: '潤滑油',
@@ -56,7 +64,7 @@ export const ITEM_DEFS = {
         id: 'chain_lightning',
         name: '閃電鏈',
         type: ITEM_TYPES.EQUIPMENT,
-        description: '攻擊命中觸發連鎖閃電（50 傷害、連鎖 20 次、20% 機率麻痺 1 秒）',
+        description: '攻擊命中觸發連鎖閃電（20 傷害、連鎖 20 次、10% 機率麻痺 1 秒）',
         icon: '鏈',
         source: 'all'
     },

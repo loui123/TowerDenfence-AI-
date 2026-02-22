@@ -50,7 +50,9 @@ export class GameEngine {
             critDmgAura: false
         };
         this.waveAffixCache = {};
+        this.waveTypeCache = {};
         this.lastPlaceTowerError = null;
+        this.towerLimitBonus = 0;
 
         console.log("GameEngine Initialized", { pathLength: path?.length, wave: this.wave });
     }
@@ -114,7 +116,8 @@ export class GameEngine {
         if (id === 'projectile_dmg_reduction') return { id, name: '投射物傷害減免', value: 0.3, desc: '承受投射物傷害減少 30%' };
         if (id === 'elemental_dmg_reduction') return { id, name: '元素傷害減免', value: 0.3, desc: '承受元素傷害減少 30%' };
         if (id === 'move_speed_up') {
-            const speedUp = this.lerpByWave(wave, 0.4, 0.8);
+            const progress = Math.max(0, Math.min(1, (wave - 10) / 50));
+            const speedUp = 0.1 + ((0.6 - 0.1) * progress);
             return {
                 id,
                 name: '怪物移動速度提升',
@@ -123,7 +126,8 @@ export class GameEngine {
             };
         }
         if (id === 'hp_percent_up') {
-            const hpUp = this.lerpByWave(wave, 0.4, 0.8);
+            const progress = Math.max(0, Math.min(1, (wave - 10) / 50));
+            const hpUp = 0.1 + ((0.6 - 0.1) * progress);
             return {
                 id,
                 name: '增加怪物生命%數',
@@ -147,7 +151,7 @@ export class GameEngine {
             projectile_dmg_reduction: 10,
             elemental_dmg_reduction: 10,
             move_speed_up: 30,
-            hp_percent_up: 70
+            hp_percent_up: 40
         };
     }
 
@@ -391,20 +395,6 @@ export class GameEngine {
         } else if (this.mobs.length === 0) {
             console.log("Wave Complete", this.wave);
             this.waveActive = false;
-            const completedWave = this.wave;
-
-            if (completedWave === 10) {
-                const continueRun = this.events.onVictory ? this.events.onVictory() : false;
-                if (!continueRun) {
-                    this.victory = true;
-                    this.paused = true;
-                    return;
-                }
-                this.wave++;
-                this.events.onWaveComplete(this.wave);
-                return;
-            }
-
             this.wave++;
             this.events.onWaveComplete(this.wave);
         }
@@ -429,6 +419,7 @@ export class GameEngine {
             id: Math.random(),
             type: typeId,
             isBoss,
+            spawnWave: this.wave,
             hp: 10 * this.wave * buff * this.getWaveHpScale(this.wave) * bossHpMultiplier * hpMult,
             maxHp: 10 * this.wave * buff * this.getWaveHpScale(this.wave) * bossHpMultiplier * hpMult,
             speed: 2 * bossSpeedMultiplier * (1 + moveSpeedUp),
@@ -746,6 +737,14 @@ export class GameEngine {
                         p.hitHistory = allowRepeatChain ? [] : [...excludedIds];
                         continue;
                     }
+                    if (allowRepeatChain && canHit) {
+                        const bonusHits = Math.max(0, p.remainingChains || 0);
+                        if (bonusHits > 0) {
+                            const bonusMultiplier = (p.chainMultiplier || 1) * bonusHits;
+                            this.damageMob(target, this.scaleDamage(p.damage, bonusMultiplier), p.sourceTower, p.crit);
+                            p.remainingChains = 0;
+                        }
+                    }
                 }
 
                 this.projectiles.splice(i, 1);
@@ -838,8 +837,8 @@ export class GameEngine {
     }
 
     handleKill(mob, tower) {
-        let dropAmount = 1;
-        dropAmount = Math.max(1, Math.floor(dropAmount * this.getMobDropMultiplier()));
+        const waveDropMult = this.getWaveResourceDropMultiplier(mob?.spawnWave || this.wave);
+        const dropAmount = Math.max(1, Math.floor(waveDropMult * this.getMobDropMultiplier()));
 
         const typeDef = Object.values(MONSTER_TYPES).find(m => m.id === mob.type);
         if (typeDef) {
@@ -875,13 +874,16 @@ export class GameEngine {
     rollItemDrop(mob) {
         if (!mob || !this.events?.onItemDrop) return;
         const table = MONSTER_ITEM_DROP_TABLE[mob.type] || [];
-        if (table.length === 0) return;
         const itemDropMult = 1 + Math.max(0, this.getTalentValue('item_drop_rate'));
 
         for (const entry of table) {
             if (Math.random() < Math.min(1, entry.chance * itemDropMult)) {
                 this.events.onItemDrop(entry.itemId, 1, mob.type);
             }
+        }
+
+        if (mob.isBoss && Math.random() < 0.1) {
+            this.events.onItemDrop('build_book', 1, mob.type);
         }
     }
 
@@ -1244,7 +1246,7 @@ export class GameEngine {
     }
 
     getTowerLimit() {
-        return 5 + Math.max(0, Math.floor(this.getTalentValue('tower_limit')));
+        return 5 + Math.max(0, Math.floor(this.getTalentValue('tower_limit'))) + Math.max(0, this.towerLimitBonus || 0);
     }
 
     getLastPlaceTowerError() {
@@ -1266,10 +1268,19 @@ export class GameEngine {
         const direct = WAVE_CONFIG[wave - 1];
         if (direct) return direct;
         const fallback = WAVE_CONFIG[WAVE_CONFIG.length - 1] || { type: 'normal', count: 30 };
+        if (!this.waveTypeCache[wave]) {
+            const typePool = Object.values(MONSTER_TYPES).map((m) => m.id);
+            this.waveTypeCache[wave] = typePool[Math.floor(Math.random() * typePool.length)] || fallback.type;
+        }
         return {
-            type: fallback.type,
+            type: this.waveTypeCache[wave],
             count: fallback.count
         };
+    }
+
+    getWaveResourceDropMultiplier(wave) {
+        const safeWave = Math.max(1, Math.floor(wave || 1));
+        return 1 + ((safeWave - 1) * 0.1);
     }
 
     getWaveHpScale(wave) {
@@ -1519,7 +1530,7 @@ export class GameEngine {
         if (!primaryTarget || !sourceTower?.equipmentId) return;
 
         if (sourceTower.equipmentId === 'chain_lightning') {
-            this.triggerChainLightning(primaryTarget, sourceTower, 50, 20, 0.2, 1.0);
+            this.triggerChainLightning(primaryTarget, sourceTower, 20, 20, 0.1, 1.0);
         }
     }
 
@@ -1624,6 +1635,10 @@ export class GameEngine {
             if (itemId === 'crit_book') {
                 tower.stats.crit = Math.min(1, (tower.stats.crit || 0) + 0.1);
                 return { ok: true, message: `${item.name} 已使用` };
+            }
+            if (itemId === 'build_book') {
+                this.towerLimitBonus = (this.towerLimitBonus || 0) + 1;
+                return { ok: true, message: `${item.name} 已使用（本局建塔上限 +1）` };
             }
             return { ok: false, message: '此消耗道具尚未實作' };
         }
@@ -1883,7 +1898,7 @@ export class GameEngine {
         const globalDamageMult = this.globalMasteries.poisonDamageMult || 1;
         const globalDurationMin = this.globalMasteries.poisonDurationMin || 0;
         const globalTickRateMult = this.globalMasteries.poisonTickRateMult || 1;
-        const sourceTickRateMult = 1 + (0.1 * Math.max(0, sourcePoisonFreqLevel));
+        const sourceTickRateMult = 1 + (0.25 * Math.max(0, sourcePoisonFreqLevel));
         const tickInterval = 1 / Math.max(0.1, sourceTickRateMult * globalTickRateMult);
 
         const poisonReduction = Math.max(0, target.affixMap?.poison_dmg_reduction || 0);

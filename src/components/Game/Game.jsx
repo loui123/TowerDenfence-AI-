@@ -21,7 +21,7 @@ const UPGRADE_POOL = [
     { id: 'wood_dmg', label: '木屬性附加傷害 +25%', desc: '增加木屬性追加傷害，並附加中毒效果', element: 'wood' },
     { id: 'poison_dmg', label: '中毒傷害 +40%', desc: '木附傷帶來的中毒每級 +40% 傷害', element: 'wood', maxCount: 3 },
     { id: 'poison_duration', label: '中毒時間 +2秒', desc: '木附傷帶來的中毒持續時間 +2 秒', element: 'wood', maxCount: 3 },
-    { id: 'poison_frequency', label: '中毒頻率 +10%', desc: '木附傷帶來的中毒傷害頻率每級 +10%', element: 'wood' },
+    { id: 'poison_frequency', label: '中毒頻率 +25%', desc: '木附傷帶來的中毒傷害頻率每級 +25%', element: 'wood' },
     { id: 'base_dmg', label: '基礎傷害 +25%', desc: '直接提升基礎傷害' },
     { id: 'crit_chance', label: '暴擊率 +10%', desc: '提高暴擊觸發機率' },
     { id: 'crit_dmg', label: '暴擊傷害 +20%', desc: '提高暴擊倍率' },
@@ -286,7 +286,6 @@ const Game = ({ onExit }) => {
     const engineRef = useRef(null);
     const visualsRef = useRef({});
     const autoNextWaveRef = useRef(false);
-    const crystalGrantedRef = useRef(false);
     const topBarRef = useRef(null);
     const audioCtxRef = useRef(null);
     const bgmGainRef = useRef(null);
@@ -594,22 +593,6 @@ const Game = ({ onExit }) => {
                 triggerSfx('defeat');
                 setGameOver(true);
                 engine.stop();
-            },
-            onVictory: () => {
-                triggerSfx('victory');
-                if (!crystalGrantedRef.current) {
-                    addResource(RESOURCES.BLUE_CRYSTAL, 1);
-                    crystalGrantedRef.current = true;
-                }
-
-                const continuePlay = window.confirm('已完成第10關，獲得 1 藍水晶。按「確定」繼續遊玩（後續不再獲得藍水晶），按「取消」返回主選單。');
-                if (!continuePlay) {
-                    engine.stop();
-                    handleExitWithRecord();
-                    return false;
-                }
-
-                return true;
             },
             onWaveComplete: (wave) => {
                 triggerSfx('wave');
@@ -1306,10 +1289,12 @@ const Game = ({ onExit }) => {
         };
     })();
 
+    const sessionElapsedSec = Math.max(1, Math.floor((Date.now() - sessionStartRef.current) / 1000));
     const towerRows = engine
         ? [...engine.towers].map((tower) => {
             const auraSnapshot = engine.getTowerAuraSnapshot?.(tower) || null;
             const supportAuraStatus = isSupportTower(tower) ? (engine.getSupportAuraStatus?.(tower) || null) : null;
+            const totalDamage = Math.floor(tower.totalDamageDealt || 0);
             return {
                 id: tower.id,
                 name: getTowerName(tower.type),
@@ -1320,12 +1305,14 @@ const Game = ({ onExit }) => {
                 supportExp: tower.supportExp || 0,
                 supportAuraType: tower.supportAuraType || null,
                 supportAuraRange: tower.type === 'support' ? (1 + (tower.supportAuraRangeBonus || 0)) : null,
-                damage: Math.floor(tower.totalDamageDealt || 0),
+                damage: totalDamage,
+                dps: totalDamage / sessionElapsedSec,
                 equipmentName: tower.equipmentName || null,
                 auraSnapshot,
                 supportAuraStatus
             };
         })
+            .sort((a, b) => (b.dps - a.dps) || (b.damage - a.damage) || (b.kills - a.kills))
         : [];
 
     const towerRankRows = [...towerRows]
