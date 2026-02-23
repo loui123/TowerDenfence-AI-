@@ -13,6 +13,7 @@ const INITIAL_STATE = {
         [RESOURCES.GOLD_ORE]: 0,
     },
     talents: {}, // id: level
+    talentPurchaseCosts: {}, // id: number[]
     settings: {
         bgmEnabled: true,
         sfxEnabled: true
@@ -35,6 +36,9 @@ export const GameProvider = ({ children }) => {
                     ...INITIAL_STATE.resources,
                     ...(parsed?.resources || {})
                 },
+                talentPurchaseCosts: parsed?.talentPurchaseCosts && typeof parsed.talentPurchaseCosts === 'object'
+                    ? parsed.talentPurchaseCosts
+                    : {},
                 runStats: {
                     ...INITIAL_STATE.runStats,
                     ...(parsed?.runStats || {}),
@@ -66,22 +70,46 @@ export const GameProvider = ({ children }) => {
 
     const getTalentDef = (talentId) => TALENTS[Object.keys(TALENTS).find(k => TALENTS[k].id === talentId)];
 
+    const getTalentCostGroup = (talent) => {
+        if (!talent) return 'shared';
+        return talent.costType === RESOURCES.GOLD_ORE ? 'gold_ore' : 'shared';
+    };
+
+    const getCostGrowthForGroup = (group) => {
+        if (group === 'gold_ore') return 1.16;
+        return 1.12;
+    };
+
+    const getGroupSpentLevels = (group, talentsMap) => {
+        const safeTalents = talentsMap || {};
+        return Object.values(TALENTS).reduce((sum, talent) => {
+            if (getTalentCostGroup(talent) !== group) return sum;
+            return sum + Math.max(0, safeTalents[talent.id] || 0);
+        }, 0);
+    };
+
+    const getSharedCurveCost = (talent, talentsMap) => {
+        if (!talent) return 0;
+        const group = getTalentCostGroup(talent);
+        const spentLevels = getGroupSpentLevels(group, talentsMap);
+        const growth = getCostGrowthForGroup(group);
+        return Math.floor(talent.baseCost * Math.pow(growth, spentLevels));
+    };
+
     const canAffordTalent = (talentId) => {
         const talent = getTalentDef(talentId);
         if (!talent) return false;
 
         const level = saveData.talents[talentId] || 0;
         if (talent.maxLevel !== undefined && level >= talent.maxLevel) return false;
-        // Simple cost formula: base * (level + 1)
-        const cost = Math.floor(talent.baseCost * Math.pow(1.5, level));
+        const cost = getSharedCurveCost(talent, saveData.talents);
         return (saveData.resources[talent.costType] || 0) >= cost;
     };
 
     const getTalentCost = (talentId) => {
         const talent = getTalentDef(talentId);
         if (!talent) return 0;
-        const level = saveData.talents[talentId] || 0;
-        return Math.floor(talent.baseCost * Math.pow(1.5, level));
+        return getSharedCurveCost(talent, saveData.talents);
     };
 
     const upgradeTalent = (talentId) => {
@@ -101,6 +129,10 @@ export const GameProvider = ({ children }) => {
             talents: {
                 ...prev.talents,
                 [talentId]: (prev.talents[talentId] || 0) + 1
+            },
+            talentPurchaseCosts: {
+                ...(prev.talentPurchaseCosts || {}),
+                [talentId]: [...(prev.talentPurchaseCosts?.[talentId] || []), cost]
             }
         }));
     };
@@ -114,8 +146,13 @@ export const GameProvider = ({ children }) => {
         const level = saveData.talents[talentId] || 0;
         if (level <= 0) return 0;
 
-        // Refund the exact cost paid for the latest level.
-        return Math.floor(talent.baseCost * Math.pow(1.5, level - 1));
+        const history = saveData.talentPurchaseCosts?.[talentId];
+        if (Array.isArray(history) && history.length > 0) {
+            return Math.floor(history[history.length - 1]);
+        }
+
+        // Backward compatibility for legacy saves without purchase history.
+        return Math.floor(talent.baseCost * Math.pow(1.5, Math.max(0, level - 1)));
     };
 
     const refundTalent = (talentId) => {
@@ -137,13 +174,22 @@ export const GameProvider = ({ children }) => {
                 nextTalents[talentId] = nextLevel;
             }
 
+            const nextPurchaseCosts = { ...(prev.talentPurchaseCosts || {}) };
+            if (Array.isArray(nextPurchaseCosts[talentId]) && nextPurchaseCosts[talentId].length > 0) {
+                nextPurchaseCosts[talentId] = nextPurchaseCosts[talentId].slice(0, -1);
+                if (nextPurchaseCosts[talentId].length === 0) {
+                    delete nextPurchaseCosts[talentId];
+                }
+            }
+
             return {
                 ...prev,
                 resources: {
                     ...prev.resources,
                     [talent.costType]: (prev.resources[talent.costType] || 0) + refund
                 },
-                talents: nextTalents
+                talents: nextTalents,
+                talentPurchaseCosts: nextPurchaseCosts
             };
         });
     };

@@ -44,6 +44,94 @@ export const ITEM_DEFS = {
         icon: '建',
         source: 'boss'
     },
+    range_book: {
+        id: 'range_book',
+        name: '射程之書',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '塔的攻擊距離 +1。',
+        icon: '距',
+        source: 'all'
+    },
+    fury_book: {
+        id: 'fury_book',
+        name: '狂怒之書',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '塔的攻速 +20%。',
+        icon: '怒',
+        source: 'all'
+    },
+    precision_book: {
+        id: 'precision_book',
+        name: '精準之書',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '塔的暴擊率 +15%（最高 100%）。',
+        icon: '精',
+        source: 'all'
+    },
+    fire_oil: {
+        id: 'fire_oil',
+        name: '烈火塗層',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '塔獲得等同基礎傷害 25% 的火附傷。',
+        icon: '焰',
+        source: 'fire'
+    },
+    water_oil: {
+        id: 'water_oil',
+        name: '寒流塗層',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '塔獲得等同基礎傷害 25% 的水附傷。',
+        icon: '霜',
+        source: 'water'
+    },
+    wood_oil: {
+        id: 'wood_oil',
+        name: '荊棘塗層',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '塔獲得等同基礎傷害 25% 的木附傷。',
+        icon: '棘',
+        source: 'wood'
+    },
+    fortify_book: {
+        id: 'fortify_book',
+        name: '強化之書',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '塔的傷害 +20%。',
+        icon: '強',
+        source: 'all'
+    },
+    split_manual: {
+        id: 'split_manual',
+        name: '分裂手冊',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '投射塔攻擊目標數 +1。',
+        icon: '裂',
+        source: 'all'
+    },
+    chain_manual: {
+        id: 'chain_manual',
+        name: '連鎖手冊',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '投射塔連鎖次數 +1。',
+        icon: '鏈',
+        source: 'all'
+    },
+    repair_kit: {
+        id: 'repair_kit',
+        name: '急救套件',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '連點兩下立即使用：生命 +1；若已滿血則先最大生命 +1，再恢復 1 點生命。',
+        icon: '補',
+        source: 'all'
+    },
+    specialization_reset_scroll: {
+        id: 'specialization_reset_scroll',
+        name: '專精重置卷軸',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '重置已點過的滿等塔專精，並可重新選擇。',
+        icon: '重',
+        source: 'boss'
+    },
     lubricant: {
         id: 'lubricant',
         name: '潤滑油',
@@ -72,7 +160,7 @@ export const ITEM_DEFS = {
         id: 'chain_lightning',
         name: '閃電',
         type: ITEM_TYPES.EQUIPMENT,
-        description: '塔命中時觸發閃電連鎖（20*塔等級傷害、20 次連鎖、10% 機率麻痺 1 秒）。',
+        description: '塔命中時觸發閃電連鎖（1x基礎傷害、10 次連鎖、10% 機率麻痺 1 秒；可吃連鎖加成）。',
         icon: '雷',
         source: 'all'
     },
@@ -99,43 +187,200 @@ export const ITEM_DEFS = {
         description: '附近 3 格友方塔攻速 +10%。',
         icon: '敏',
         source: 'all'
+    },
+    sniper_scope: {
+        id: 'sniper_scope',
+        name: '狙擊鏡',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '裝備塔攻擊距離 +2。',
+        icon: '鏡',
+        source: 'all'
+    },
+    war_drum: {
+        id: 'war_drum',
+        name: '戰鼓',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '裝備塔攻速 +20%。',
+        icon: '鼓',
+        source: 'all'
+    },
+    giant_slayer: {
+        id: 'giant_slayer',
+        name: '巨人殺手',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '對 Boss 造成傷害 +60%。',
+        icon: '斬',
+        source: 'all'
+    },
+    executioner_axe: {
+        id: 'executioner_axe',
+        name: '處決之斧',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '對 35% 以下生命目標造成傷害 +50%。',
+        icon: '刑',
+        source: 'all'
+    },
+    frost_emblem: {
+        id: 'frost_emblem',
+        name: '寒霜徽記',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '命中有機率施加短暫緩速。',
+        icon: '冰',
+        source: 'water'
+    },
+    burn_emblem: {
+        id: 'burn_emblem',
+        name: '灼燒徽記',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '命中附加灼燒持續傷害。',
+        icon: '灼',
+        source: 'fire'
+    },
+    venom_core: {
+        id: 'venom_core',
+        name: '毒液核心',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '命中附加中毒效果。',
+        icon: '毒',
+        source: 'wood'
+    },
+    ricochet_module: {
+        id: 'ricochet_module',
+        name: '彈射模組',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '投射塔連鎖次數 +2。',
+        icon: '彈',
+        source: 'all'
+    },
+    multishot_module: {
+        id: 'multishot_module',
+        name: '多重模組',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '投射塔攻擊目標數 +1。',
+        icon: '多',
+        source: 'all'
+    },
+    shock_core: {
+        id: 'shock_core',
+        name: '電震核心',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '命中有機率暈眩目標 0.2 秒。',
+        icon: '震',
+        source: 'all'
+    },
+    rupture_blade: {
+        id: 'rupture_blade',
+        name: '裂傷之刃',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '命中附加流血效果（可與近戰流血疊加等級）。',
+        icon: '裂',
+        source: 'all'
+    },
+    siege_shell: {
+        id: 'siege_shell',
+        name: '攻城彈頭',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '砲擊塔爆炸範圍/擊退提升。',
+        icon: '砲',
+        source: 'fire'
+    },
+    gravity_well: {
+        id: 'gravity_well',
+        name: '重力井',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '緩速塔緩速範圍與持續時間提升。',
+        icon: '井',
+        source: 'water'
+    },
+    mana_reactor: {
+        id: 'mana_reactor',
+        name: '法力反應爐',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '法術塔觸發等級 +1。',
+        icon: '爐',
+        source: 'all'
+    },
+    crystal_lens: {
+        id: 'crystal_lens',
+        name: '晶核透鏡',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '裝備塔暴擊傷害 +50%。',
+        icon: '晶',
+        source: 'all'
+    },
+    lucky_coin: {
+        id: 'lucky_coin',
+        name: '幸運硬幣',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '擊殺有機率額外掉落資源。',
+        icon: '幣',
+        source: 'all'
+    },
+    vampire_fang: {
+        id: 'vampire_fang',
+        name: '吸血獠牙',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '擊殺有機率回復玩家生命 1 點。',
+        icon: '牙',
+        source: 'all'
+    },
+    time_weaver: {
+        id: 'time_weaver',
+        name: '織時器',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '裝備塔攻速 +15%。',
+        icon: '時',
+        source: 'all'
+    },
+    last_stand_emblem: {
+        id: 'last_stand_emblem',
+        name: '背水徽記',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '玩家生命低於等於 1 時，裝備塔傷害 +35%。',
+        icon: '背',
+        source: 'all'
+    },
+    echo_rune: {
+        id: 'echo_rune',
+        name: '回響符文',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '命中有機率觸發一次回響打擊。',
+        icon: '響',
+        source: 'all'
     }
 };
 
 export const MONSTER_ITEM_DROP_TABLE = {
+    normal: [
+        { itemId: 'crit_book', chance: 0.05 },
+        { itemId: 'speed_book', chance: 0.02 },
+        { itemId: 'build_book', chance: 0.02 }
+    ],
     fire: [
+        { itemId: 'crit_book', chance: 0.05 },
         { itemId: 'power_book', chance: 0.02 },
-        { itemId: 'lubricant', chance: 0.004 },
-        { itemId: 'full_firepower', chance: 0.004 },
-        { itemId: 'chain_lightning', chance: 0.002 },
-        { itemId: 'courage_banner', chance: 0.002 },
-        { itemId: 'slaughter_banner', chance: 0.002 },
-        { itemId: 'agility_banner', chance: 0.002 }
+        { itemId: 'build_book', chance: 0.02 }
     ],
     water: [
-        { itemId: 'level_book', chance: 0.01 },
-        { itemId: 'lubricant', chance: 0.004 },
-        { itemId: 'full_firepower', chance: 0.004 },
-        { itemId: 'chain_lightning', chance: 0.002 },
-        { itemId: 'courage_banner', chance: 0.002 },
-        { itemId: 'slaughter_banner', chance: 0.002 },
-        { itemId: 'agility_banner', chance: 0.002 }
+        { itemId: 'speed_book', chance: 0.05 },
+        { itemId: 'crit_book', chance: 0.02 },
+        { itemId: 'build_book', chance: 0.02 }
     ],
     wood: [
-        { itemId: 'speed_book', chance: 0.01 },
-        { itemId: 'lubricant', chance: 0.004 },
-        { itemId: 'full_firepower', chance: 0.004 },
-        { itemId: 'chain_lightning', chance: 0.002 },
-        { itemId: 'courage_banner', chance: 0.002 },
-        { itemId: 'slaughter_banner', chance: 0.002 },
-        { itemId: 'agility_banner', chance: 0.002 }
-    ],
-    normal: [
-        { itemId: 'lubricant', chance: 0.004 },
-        { itemId: 'full_firepower', chance: 0.004 },
-        { itemId: 'chain_lightning', chance: 0.002 },
-        { itemId: 'courage_banner', chance: 0.002 },
-        { itemId: 'slaughter_banner', chance: 0.002 },
-        { itemId: 'agility_banner', chance: 0.002 }
+        { itemId: 'power_book', chance: 0.05 },
+        { itemId: 'crit_book', chance: 0.02 },
+        { itemId: 'build_book', chance: 0.02 }
     ]
 };
+
+export const BOSS_EXTRA_DROP_TABLE = [
+    { itemId: 'build_book', chance: 0.2 },
+    { itemId: 'level_book', chance: 0.1 },
+    { itemId: 'specialization_reset_scroll', chance: 0.02 },
+    { itemId: 'lubricant', chance: 0.02 },
+    { itemId: 'full_firepower', chance: 0.02 },
+    { itemId: 'chain_lightning', chance: 0.02 },
+    { itemId: 'courage_banner', chance: 0.03 },
+    { itemId: 'slaughter_banner', chance: 0.03 },
+    { itemId: 'agility_banner', chance: 0.03 }
+];

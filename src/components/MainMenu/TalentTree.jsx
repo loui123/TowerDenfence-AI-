@@ -20,7 +20,7 @@ const RESOURCE_LABELS = {
 };
 
 const TALENT_CATEGORIES = [
-    { id: 'level_config', title: '關卡設定', talentIds: ['initial_gold', 'player_max_hp', 'item_drop_rate', 'tower_limit', 'mob_hp_drop', 'mob_density', 'equip_absorption_force'] },
+    { id: 'level_config', title: '關卡設定', talentIds: ['initial_gold', 'player_max_hp', 'item_drop_rate', 'tower_limit', 'mob_hp_drop', 'mob_density', 'equip_absorption_force', 'fire_mob_rate_up', 'fire_mob_rate_down', 'water_mob_rate_up', 'water_mob_rate_down', 'wood_mob_rate_up', 'wood_mob_rate_down'] },
     {
         id: 'melee',
         title: '近戰塔特性',
@@ -48,9 +48,11 @@ const formatTalentEffect = (talentId, perLevel) => {
     if (talentId === 'player_max_hp') return `每級 +${perLevel} 最大生命`;
     if (talentId === 'tower_limit') return `每級 +${perLevel} 可建塔上限`;
     if (talentId === 'mob_hp_drop') return '每級 +30% 怪物血量、+10% 資源掉落';
-    if (talentId === 'mob_density') return '每級怪物密度 x1.4（同波時長）';
+    if (talentId === 'mob_density') return '每級 +0.25 倍怪物數量（最多 x2）';
     if (talentId === 'equip_absorption_force') return '最多 1 次，開始遊戲獲得裝備「吸收之力」';
     if (talentId === 'item_drop_rate') return `每級 +${Math.floor(perLevel * 100)}% 道具掉落率`;
+    if (talentId.endsWith('_mob_rate_up')) return `每級 +${Math.floor(perLevel * 100)}% 對應屬性怪權重`;
+    if (talentId.endsWith('_mob_rate_down')) return `每級 -${Math.floor(perLevel * 100)}% 對應屬性怪權重`;
     if (
         talentId.endsWith('_attr_dmg')
         || talentId.endsWith('_atk_speed')

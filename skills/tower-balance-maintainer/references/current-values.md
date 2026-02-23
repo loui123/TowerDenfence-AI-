@@ -309,3 +309,111 @@
 | `elemental_dmg_reduction` | 元素傷害減免 | 10 | 固定30% |
 | `move_speed_up` | 怪物移動速度提升10~60% | 30 | 10波後生效，60波內遞進至60% |
 | `hp_percent_up` | 增加怪物生命10~60%數 | 40 | 新增：10波後生效，60波內遞進至60% |
+
+## 2026-02-23 更新（已實作）
+
+### A. 詞墜頻率與規則
+- 11~19 波：固定 1 詞墜
+- 20~29 波：固定 2 詞墜（同波不重複）
+- 30~39 波：固定 3 詞墜（同控制系詞墜不重複）
+- 40 波後：每 10 波 +1 詞墜
+- 30 波後允許重複的詞墜僅有 move_speed_up、hp_percent_up
+
+### B. 控制遞減與控制平衡
+- 新增控制抗性遞減：slow/stun/palsy/knockback，5 秒內連續控制會遞減效果，最低保留 35%
+- 緩速疊加改為「最強緩速 100% + 其餘 30%」
+
+### C. 地形/塔/裝備共鳴
+- 新增 6 組共鳴（地形 x 塔型 x 裝備），會影響攻速、傷害、暴擊、緩速、擊退、連鎖等
+- 關卡資訊面板可查看當波與下波共鳴提示
+
+### D. 元素異常系統（火/水）
+- 水分支新增「凍傷」：最高 100 層，持續 3 秒，刷新時疊層；每層提高承傷 5%
+- 火分支新增「灼傷」：持續 3 秒，刷新時間；每秒傷害 = 灼傷層數 x 灼傷附加時命中傷害平均值
+- spec_water_global、spec_fire_global 改為全塔附加凍傷/灼傷
+
+### E. 地形對異常加成
+- swamp：凍傷每層增傷 +30%，灼傷傷害 -20%
+- desert：灼傷傷害 +40%，凍傷每層增傷 -20%
+- orest：中毒傷害 +30%
+
+### F. 新增專精重置道具
+- 新增 specialization_reset_scroll，可重置「已選過專精的 Lv10 塔」並重新選擇專精
+
+### G. 掉落權重調整
+- 道具掉落改為「期望值封頂 + 每隻怪掉落上限」
+- 一般怪最多 1 件，Boss 最多 2 件
+- 保留 Boss 額外 uild_book 10% 機率
+## 2026-02-23 更新（全域複合專精與法術複合專精）
+
+### 1) 全域複合型條件專精（新增）
+- spec_global_wood_base：條件=木附傷>=1 且基礎傷害>=1；效果=全塔基礎傷害 x1.2
+- spec_global_wood_crit_dmg：條件=木附傷>=1 且暴擊傷害>=1；效果=全塔暴傷 +0.25
+- spec_global_water_base：條件=水附傷>=1 且基礎傷害>=1；效果=全塔基礎傷害 x1.2
+- spec_global_water_speed：條件=水附傷>=1 且攻速>=1；效果=全塔攻速 x1.12
+- spec_global_fire_speed：條件=火附傷>=1 且攻速>=1；效果=全塔攻速 x1.12
+- spec_global_fire_crit：條件=火附傷>=1 且暴擊率>=1；效果=全塔暴擊率 +10%
+- spec_global_bleed_speed：條件=流血>=1 且攻速>=1；效果=全塔攻速 x1.1
+- spec_global_bleed_base：條件=流血>=1 且基礎傷害>=1；效果=全塔基礎傷害 x1.15
+
+### 2) 法術三選一天賦（新增）
+- 元素術式解除互斥：elemental_fire_magic / elemental_water_magic / elemental_wood_magic 可同塔共存
+- magic_wood_poison_talent：提升木屬性法術傷害量
+- magic_water_frostbite_talent：提升水屬性法術異常效果與傷害量
+- magic_fire_scorch_talent：提升火屬性法術異常效果與傷害量
+
+### 3) 法術複合條件專精（新增）
+- spec_magic_wood_base：木法術 + 基礎傷害；木法塔基礎傷害 x1.35
+- spec_magic_water_frost_trigger：水法術 + 凍傷天賦；法術觸發率 +25%
+- spec_magic_fire_speed：火法術；該塔攻速 x1.25
+- spec_magic_combo_wood_fire：木+火改為「焚森術」，覆蓋原本木/火法術
+- spec_magic_combo_fire_water：火+水改為「蒸潮術」，覆蓋原本火/水法術
+- spec_magic_combo_water_wood：水+木改為「潮林術」，覆蓋原本水/木法術
+- spec_magic_dual_ailment：任兩種異常法術天賦成立；提高觸發率與異常強度
+
+### 4) 輔助塔專精（新增）
+- support_spec_global_item_drop：條件=書系升級總次數（經驗/速度/力量/暴擊）>=3
+- 效果=全域道具/裝備掉落率 +15%
+
+### 5) 實作補充
+- 法術塔改為 magicElements 多元素結構；單次觸發會在已啟用元素中抽取一種施放
+- 若選到複合法術專精且元素條件成立，會取消原本單元素法術並改放複合法術
+## 2026-02-23 更新（法術塔三選一文案）
+- 木元素術式：攻擊時機率觸發龍捲風（龍捲風在場上持續3秒，每秒對範圍內怪物造成傷害），升級後提升傷害量
+- 水元素術式：攻擊時機率觸發水球，升級後提升傷害量
+- 火元素術式：攻擊時機率觸發炎爆，升級後提升傷害量
+
+## 2026-02-23 更新（龍捲風與合併法術控場）
+- 龍捲風現在具備持續控場：存在期間會持續牽引範圍內怪物，並持續附加短效緩速。
+- 合併法術（木+火 / 火+水 / 水+木）施放後，會在場地上生成持續 3 秒的控場區域。
+- 木+火、水+木：控場區會持續緩速並牽引怪物。
+- 火+水：控場區會持續強化緩速，並有機率造成短暫硬控。
+## 2026-02-23 更新（急救套件全域即時使用）
+- epair_kit 改為點擊後立即使用（不需點塔）。
+- 使用時若生命未滿：恢復 1 點生命。
+- 使用時若生命已滿：同時擴充最大生命 +1，並回滿至新上限。
+## 2026-02-23 更新（急救套件雙擊使用）
+- epair_kit 調整為「連點兩下立即使用」。
+- 若生命未滿：恢復 1 點生命。
+- 若生命已滿：先擴充最大生命 +1，再恢復 1 點生命。
+## 2026-02-23 更新（怪物數量曲線與詞墜）
+- 無天賦時出怪曲線：10波=20、20波=35、30波=55、40波=80（封頂80）
+- 公式：count = min(80, 0.025*w^2 + 0.75*w + 10)
+- mob_density：每級 +0.25 倍，最高 x2。
+- 新詞墜：
+  - mob_count_up（30波後）：怪物數量 x1.25~x3，權重10
+  - oss_count_up（30波後）：額外BOSS +1~+5，權重10
+  - rostbite_dmg_reduction（10波後）：100波內遞進至95%
+  - scorch_dmg_reduction（10波後）：100波內遞進至95%
+## 2026-02-23 更新（依 monster-info 掉落實作）
+- 一般怪掉落改為「各條目獨立判定」，並套用 item_drop_rate 倍率。
+- 四屬怪掉落表：
+  - normal：crit_book 5%、speed_book 2%、uild_book 2%
+  - fire：crit_book 5%、power_book 2%、uild_book 2%
+  - water：speed_book 5%、crit_book 2%、uild_book 2%
+  - wood：power_book 5%、crit_book 2%、uild_book 2%
+- Boss 額外掉落改為獨立判定：
+  - uild_book 20%、level_book 10%、specialization_reset_scroll 2%
+  - lubricant/full_firepower/chain_lightning 各 2%
+  - courage_banner/slaughter_banner/agility_banner 各 3%
+- 移除舊的 Boss 固定 uild_book 10% 額外判定。

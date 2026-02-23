@@ -9,15 +9,34 @@ import { Heart } from 'lucide-react';
 const CELL_SIZE = 40;
 const INITIAL_CRIT_DMG = 2.0;
 
+const hasAnyTwoAilmentTalents = (tower) => {
+    const count = [
+        tower?.upgradeStats?.magic_wood_poison_talent || 0,
+        tower?.upgradeStats?.magic_water_frostbite_talent || 0,
+        tower?.upgradeStats?.magic_fire_scorch_talent || 0
+    ].filter((v) => v > 0).length;
+    return count >= 2;
+};
+
+const supportBookUpgradeCount = (tower) => (
+    (tower?.upgradeStats?.support_gain_level_book || 0)
+    + (tower?.upgradeStats?.support_gain_speed_book || 0)
+    + (tower?.upgradeStats?.support_gain_power_book || 0)
+    + (tower?.upgradeStats?.support_gain_crit_book || 0)
+);
+
 const UPGRADE_POOL = [
     { id: 'base_magic_dmg', label: '法術基礎傷害 +20', desc: '法術塔基礎傷害提高 20', onlyMagic: true },
     { id: 'speed_magic', label: '急速施法', desc: '攻擊間隔縮短 20%（最多 5 次）', onlyMagic: true, maxCount: 5 },
     { id: 'trigger_magic', label: '法術觸發率 +20%', desc: '元素法術觸發機率提高 20%（最多 3 次）', onlyMagic: true, onlyAfterMagicElement: true, maxCount: 3 },
-    { id: 'elemental_fire_magic', label: '火元素術式', desc: '基礎傷害轉火傷；觸發火爆（基礎+40，後續每級+60）', onlyMagic: true, magicElement: 'fire' },
-    { id: 'elemental_water_magic', label: '水元素術式', desc: '基礎傷害轉水傷；觸發水花（基礎+40，後續每級+60）', onlyMagic: true, magicElement: 'water' },
-    { id: 'elemental_wood_magic', label: '木元素術式', desc: '基礎傷害轉木傷；觸發龍捲（基礎+20，後續每級+40）', onlyMagic: true, magicElement: 'wood' },
-    { id: 'fire_dmg', label: '火屬性附加傷害 +25%', desc: '增加火屬性追加傷害', element: 'fire' },
-    { id: 'water_dmg', label: '水屬性附加傷害 +25%', desc: '增加水屬性追加傷害', element: 'water' },
+    { id: 'elemental_fire_magic', label: '火元素術式', desc: '攻擊時機率觸發炎爆，升級後提升傷害量', onlyMagic: true, magicElement: 'fire' },
+    { id: 'elemental_water_magic', label: '水元素術式', desc: '攻擊時機率觸發水球，升級後提升傷害量', onlyMagic: true, magicElement: 'water' },
+    { id: 'elemental_wood_magic', label: '木元素術式', desc: '攻擊時機率觸發龍捲風（龍捲風在場上持續3秒，每秒對範圍內怪物造成傷害），升級後提升傷害量', onlyMagic: true, magicElement: 'wood' },
+    { id: 'magic_wood_poison_talent', label: '木法毒蝕', desc: '提升木屬性法術傷害量', onlyMagic: true, requiredMagicElement: 'wood', maxCount: 3 },
+    { id: 'magic_water_frostbite_talent', label: '水法凍傷', desc: '提升水屬性法術異常效果與傷害量', onlyMagic: true, requiredMagicElement: 'water', maxCount: 3 },
+    { id: 'magic_fire_scorch_talent', label: '火法灼燒', desc: '提升火屬性法術異常效果與傷害量', onlyMagic: true, requiredMagicElement: 'fire', maxCount: 3 },
+    { id: 'fire_dmg', label: '火屬性附加傷害 +25%', desc: '增加火屬性追加傷害，並附加灼傷（3秒）', element: 'fire' },
+    { id: 'water_dmg', label: '水屬性附加傷害 +25%', desc: '增加水屬性追加傷害，並附加凍傷（3秒）', element: 'water' },
     { id: 'wood_dmg', label: '木屬性附加傷害 +25%', desc: '增加木屬性追加傷害，並附加中毒效果', element: 'wood' },
     { id: 'poison_dmg', label: '中毒傷害 +40%', desc: '木附傷帶來的中毒每級 +40% 傷害', element: 'wood', maxCount: 3 },
     { id: 'poison_duration', label: '中毒時間 +2秒', desc: '木附傷帶來的中毒持續時間 +2 秒', element: 'wood', maxCount: 3 },
@@ -39,8 +58,8 @@ const UPGRADE_POOL = [
 
 const SPECIALIZATION_POOL = [
     { id: 'spec_speed_aura', label: '加速靈氣', desc: '所有塔攻速 +10%', condition: (t) => (t.upgradeStats?.speed || 0) >= 4 },
-    { id: 'spec_fire_global', label: '火之靈氣', desc: '所有塔命中觸發 20% 基礎火傷（2 格）', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 4 },
-    { id: 'spec_water_global', label: '水之靈氣', desc: '所有塔命中 25% 機率暈眩 0.15 秒並附加 50% 基礎水傷', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 4 },
+    { id: 'spec_fire_global', label: '火之靈氣', desc: '所有塔命中附加灼傷（3秒，持續刷新）', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 4 },
+    { id: 'spec_water_global', label: '水之靈氣', desc: '所有塔命中附加凍傷（3秒，最高100層）', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 4 },
     { id: 'spec_wood_global', label: '木專精', desc: '所有塔命中附加中毒（每秒 30% 基礎木傷，並延長 5 秒）', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 4 },
     { id: 'spec_crit_global', label: '暴擊靈氣', desc: '所有塔暴擊機率 +20%', condition: (t) => (t.upgradeStats?.crit_chance || 0) >= 4 },
     { id: 'spec_crit_dmg_global', label: '暴傷靈氣', desc: '所有塔暴擊傷害 +20%', condition: (t) => (t.upgradeStats?.crit_dmg || 0) >= 4 },
@@ -56,7 +75,22 @@ const SPECIALIZATION_POOL = [
     { id: 'spec_tower_half_dmg_double_speed', label: '高速連擊', desc: '基礎傷害減半，攻速翻倍' },
     { id: 'spec_tower_bleed', label: '血蝕之刃', desc: '流血傷害 +200%，流血持續時間改為 10 秒', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 3 },
     { id: 'spec_tower_poison', label: '毒蝕蔓延', desc: '所有塔中毒傷害 +200%、中毒持續至少 10 秒，並附加 15% 緩速', condition: (t) => (t.upgradeStats?.poison_dmg || 0) >= 3 },
-    { id: 'spec_tower_poison_frequency', label: '劇毒高頻', desc: '所有塔中毒頻率 +200%，並附加 15% 緩速', condition: (t) => (t.upgradeStats?.poison_frequency || 0) >= 3 }
+    { id: 'spec_tower_poison_frequency', label: '劇毒高頻', desc: '所有塔中毒頻率 +200%，並附加 15% 緩速', condition: (t) => (t.upgradeStats?.poison_frequency || 0) >= 3 },
+    { id: 'spec_global_wood_base', label: '木源增幅', desc: '全塔基礎傷害 +20%', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 1 && (t.upgradeStats?.base_dmg || 0) >= 1 },
+    { id: 'spec_global_wood_crit_dmg', label: '木源暴傷', desc: '全塔暴擊傷害 +25%', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 1 && (t.upgradeStats?.crit_dmg || 0) >= 1 },
+    { id: 'spec_global_water_base', label: '水源增幅', desc: '全塔基礎傷害 +20%', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 1 && (t.upgradeStats?.base_dmg || 0) >= 1 },
+    { id: 'spec_global_water_speed', label: '水源急速', desc: '全塔攻速 +12%', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 1 && (t.upgradeStats?.speed || 0) >= 1 },
+    { id: 'spec_global_fire_speed', label: '炎源急速', desc: '全塔攻速 +12%', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 1 && (t.upgradeStats?.speed || 0) >= 1 },
+    { id: 'spec_global_fire_crit', label: '炎源暴擊', desc: '全塔暴擊率 +10%', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 1 && (t.upgradeStats?.crit_chance || 0) >= 1 },
+    { id: 'spec_global_bleed_speed', label: '血戰急速', desc: '全塔攻速 +10%', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 1 && (t.upgradeStats?.speed || 0) >= 1 },
+    { id: 'spec_global_bleed_base', label: '血戰強襲', desc: '全塔基礎傷害 +15%', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 1 && (t.upgradeStats?.base_dmg || 0) >= 1 },
+    { id: 'spec_magic_wood_base', label: '木法增幅', desc: '木屬性法術塔基礎傷害 +35%', condition: (t) => (t.upgradeStats?.elemental_wood_magic || 0) >= 1 && (t.upgradeStats?.base_magic_dmg || 0) >= 1 },
+    { id: 'spec_magic_water_frost_trigger', label: '寒脈共振', desc: '水法凍傷流派觸發率 +25%', condition: (t) => (t.upgradeStats?.elemental_water_magic || 0) >= 1 && (t.upgradeStats?.magic_water_frostbite_talent || 0) >= 1 },
+    { id: 'spec_magic_fire_speed', label: '炎術疾馳', desc: '火屬性法術塔攻速 +25%', condition: (t) => (t.upgradeStats?.elemental_fire_magic || 0) >= 1 },
+    { id: 'spec_magic_combo_wood_fire', label: '焚森術', desc: '木+火法術改為複合法術（覆蓋原本木/火法術）', condition: (t) => (t.upgradeStats?.elemental_wood_magic || 0) >= 1 && (t.upgradeStats?.elemental_fire_magic || 0) >= 1 },
+    { id: 'spec_magic_combo_fire_water', label: '蒸潮術', desc: '火+水法術改為複合法術（覆蓋原本火/水法術）', condition: (t) => (t.upgradeStats?.elemental_fire_magic || 0) >= 1 && (t.upgradeStats?.elemental_water_magic || 0) >= 1 },
+    { id: 'spec_magic_combo_water_wood', label: '潮林術', desc: '水+木法術改為複合法術（覆蓋原本水/木法術）', condition: (t) => (t.upgradeStats?.elemental_water_magic || 0) >= 1 && (t.upgradeStats?.elemental_wood_magic || 0) >= 1 },
+    { id: 'spec_magic_dual_ailment', label: '雙異常共鳴', desc: '任兩種異常法術天賦啟用後，觸發率與異常效果提升', condition: (t) => hasAnyTwoAilmentTalents(t) }
 ];
 
 const SUPPORT_UPGRADE_POOL = [
@@ -82,7 +116,8 @@ const SUPPORT_SPECIALIZATION_POOL = [
     { id: 'support_spec_crit_books_10', label: '暴擊之書 x10', desc: '立即獲得 10 本暴擊之書' },
     { id: 'support_spec_double_aura', label: '靈氣效果翻倍', desc: '當前塔的靈氣效果提升一倍' },
     { id: 'support_spec_range_5', label: '靈氣範圍 +5', desc: '當前塔的靈氣範圍增加五格' },
-    { id: 'support_spec_lucky_aura', label: '幸運靈氣', desc: '附近塔暴擊傷害每秒隨機增加 0~2 倍' }
+    { id: 'support_spec_lucky_aura', label: '幸運靈氣', desc: '附近塔暴擊傷害每秒隨機增加 0~2 倍' },
+    { id: 'support_spec_global_item_drop', label: '尋寶指揮', desc: '全域道具/裝備掉落機率 +15%（需書系升級總計 >=3）', condition: (t) => supportBookUpgradeCount(t) >= 3 }
 ];
 
 const TOWER_SHORT_LABEL = {
@@ -102,7 +137,7 @@ const TERRAIN_META = {
     },
     forest: {
         name: '森林',
-        description: '投射物塔 30% 丟失攻擊，近戰塔暴擊 +20%',
+        description: '投射物塔 30% 丟失攻擊，近戰塔暴擊 +20%，中毒傷害 +30%',
         image: 'repeating-linear-gradient(45deg, rgba(40,120,55,0.28) 0 8px, rgba(20,80,35,0.16) 8px 16px)'
     },
     plain: {
@@ -112,12 +147,12 @@ const TERRAIN_META = {
     },
     swamp: {
         name: '沼澤',
-        description: '緩速塔緩速效果 +20%，近戰塔攻速 -20%，路徑怪物移速 -30%',
+        description: '緩速塔緩速效果 +20%，近戰塔攻速 -20%，路徑怪物移速 -30%，凍傷每層增傷 +30%，灼傷傷害 -20%',
         image: 'repeating-radial-gradient(circle at 25% 35%, rgba(70,100,60,0.24) 0 10px, rgba(50,70,40,0.1) 10px 18px)'
     },
     desert: {
         name: '沙地',
-        description: '塔攻速 -10%，塔傷害 +20%',
+        description: '塔攻速 -10%，塔傷害 +20%，灼傷傷害 +40%，凍傷每層增傷 -20%',
         image: 'linear-gradient(140deg, rgba(220,190,120,0.2), rgba(170,140,85,0.12))'
     },
     rocky: {
@@ -307,8 +342,8 @@ const Game = ({ onExit }) => {
     const [gameState, setGameState] = useState({
         gold: 200,
         wave: 1,
-        hp: 1,
-        maxHp: 1,
+        hp: 5,
+        maxHp: 5,
         mobsCount: 0,
         waveActive: false,
         gameSpeed: 1,
@@ -1085,8 +1120,9 @@ const Game = ({ onExit }) => {
             ) return false;
             if (option.id === 'crit_chance' && (tower.stats?.crit || 0) >= 1) return false;
             if (option.maxCount && (tower.upgradeStats?.[option.id] || 0) >= option.maxCount) return false;
-            if (option.magicElement && tower.magicElement && tower.magicElement !== option.magicElement) return false;
-            if (option.onlyAfterMagicElement && !tower.magicElement) return false;
+            const magicElements = tower.magicElements || {};
+            if (option.requiredMagicElement && !(magicElements[option.requiredMagicElement] > 0)) return false;
+            if (option.onlyAfterMagicElement && Object.values(magicElements).every((v) => (v || 0) <= 0)) return false;
             if (!option.element) return true;
             if (!tower.lockedElement) return true;
             return option.element === tower.lockedElement;
@@ -1110,7 +1146,13 @@ const Game = ({ onExit }) => {
     const getSpecializationChoices = (tower) => {
         if (!tower) return [];
         if (isSupportTower(tower)) {
-            return shuffle(SUPPORT_SPECIALIZATION_POOL).slice(0, 3);
+            const globalMasteries = engineRef.current?.globalMasteries || {};
+            const filteredSupport = SUPPORT_SPECIALIZATION_POOL.filter((option) => {
+                if (option.id === 'support_spec_global_item_drop' && globalMasteries.itemDropAura) return false;
+                if (option.condition && !option.condition(tower)) return false;
+                return true;
+            });
+            return shuffle(filteredSupport).slice(0, 3);
         }
         const globalMasteries = engineRef.current?.globalMasteries || {};
 
@@ -1123,6 +1165,14 @@ const Game = ({ onExit }) => {
             if (option.id === 'spec_crit_dmg_global' && globalMasteries.critDmgAura) return false;
             if (option.id === 'spec_tower_poison' && globalMasteries.poisonMastery) return false;
             if (option.id === 'spec_tower_poison_frequency' && globalMasteries.poisonFrequencyMastery) return false;
+            if (option.id === 'spec_global_wood_base' && globalMasteries.woodBaseAura) return false;
+            if (option.id === 'spec_global_wood_crit_dmg' && globalMasteries.woodCritDmgAura) return false;
+            if (option.id === 'spec_global_water_base' && globalMasteries.waterBaseAura) return false;
+            if (option.id === 'spec_global_water_speed' && globalMasteries.waterSpeedAura) return false;
+            if (option.id === 'spec_global_fire_speed' && globalMasteries.fireSpeedAura) return false;
+            if (option.id === 'spec_global_fire_crit' && globalMasteries.fireCritAura) return false;
+            if (option.id === 'spec_global_bleed_speed' && globalMasteries.bleedSpeedAura) return false;
+            if (option.id === 'spec_global_bleed_base' && globalMasteries.bleedBaseAura) return false;
             if (option.condition && !option.condition(tower)) return false;
             return true;
         });
@@ -1157,6 +1207,9 @@ const Game = ({ onExit }) => {
             if (tower.lockedElement === 'fire' && id === 'spec_fire_global') p += 35;
             if (tower.lockedElement === 'water' && id === 'spec_water_global') p += 35;
             if (tower.lockedElement === 'wood' && id === 'spec_wood_global') p += 35;
+            if (isMagicTower(tower) && id.startsWith('spec_magic_')) p += 60;
+            if (!isMagicTower(tower) && id.startsWith('spec_magic_')) p -= 100;
+            if (id.startsWith('spec_global_')) p += 30;
 
             return p;
         };
@@ -1231,7 +1284,7 @@ const Game = ({ onExit }) => {
 
     const tryUseGlobalItem = (itemId) => {
         if (!engineRef.current) return false;
-        if (itemId !== 'build_book') return false;
+        if (itemId !== 'build_book' && itemId !== 'repair_kit') return false;
 
         const result = engineRef.current.applyGlobalItem(itemId);
         if (!result?.ok) {
@@ -1260,7 +1313,7 @@ const Game = ({ onExit }) => {
                 const result = engineRef.current.applyInventoryItem(tower, selectedInventoryItem.id);
                 if (!result?.ok) {
                     triggerSfx('error');
-                    window.alert(result?.message || '使用道具失敗');
+                    appendConsoleLog(result?.message || '使用道具失敗');
                     return;
                 }
 
@@ -1352,7 +1405,7 @@ const Game = ({ onExit }) => {
         const rerollCost = (tower.level || 1) * 20;
         if (engineRef.current.gold < rerollCost) {
             triggerSfx('error');
-            window.alert(`金幣不足，重骰需要 ${rerollCost}`);
+            appendConsoleLog(`金幣不足，重骰需要 ${rerollCost}`);
             return;
         }
 
@@ -1373,6 +1426,10 @@ const Game = ({ onExit }) => {
     const selectedTowerDetail = (() => {
         if (!selectedTower) return null;
         const typeDef = Object.values(TOWER_TYPES).find((t) => t.id === selectedTower.type);
+        const resonanceCatalog = engine?.getResonanceCatalog?.() || [];
+        const resonanceNameMap = Object.fromEntries(resonanceCatalog.map((r) => [r.id, r.name]));
+        const resonance = engine?.getTowerResonanceEffects?.(selectedTower) || {};
+        const resonanceNames = (resonance.activeIds || []).map((id) => resonanceNameMap[id]).filter(Boolean);
         const baseStats = typeDef?.stats || {};
         const auraSnapshot = engine?.getTowerAuraSnapshot?.(selectedTower) || {
             damagePct: 0,
@@ -1459,6 +1516,7 @@ const Game = ({ onExit }) => {
             initialRange,
             extraRange,
             equipmentName: selectedTower.equipmentName || null,
+            resonanceNames,
             talentRows: [...specRows, ...upgradeRows],
             auraSnapshot,
             supportAuraStatus
@@ -1468,6 +1526,10 @@ const Game = ({ onExit }) => {
     const sessionElapsedSec = Math.max(1, Math.floor((Date.now() - sessionStartRef.current) / 1000));
     const towerRows = engine
         ? [...engine.towers].map((tower) => {
+            const resonanceCatalog = engine.getResonanceCatalog?.() || [];
+            const resonanceNameMap = Object.fromEntries(resonanceCatalog.map((r) => [r.id, r.name]));
+            const resonance = engine.getTowerResonanceEffects?.(tower) || {};
+            const resonanceNames = (resonance.activeIds || []).map((id) => resonanceNameMap[id]).filter(Boolean);
             const auraSnapshot = engine.getTowerAuraSnapshot?.(tower) || null;
             const supportAuraStatus = isSupportTower(tower) ? (engine.getSupportAuraStatus?.(tower) || null) : null;
             const totalDamage = Math.floor(tower.totalDamageDealt || 0);
@@ -1484,6 +1546,7 @@ const Game = ({ onExit }) => {
                 damage: totalDamage,
                 dps: totalDamage / sessionElapsedSec,
                 equipmentName: tower.equipmentName || null,
+                resonanceNames,
                 auraSnapshot,
                 supportAuraStatus
             };
@@ -1500,16 +1563,16 @@ const Game = ({ onExit }) => {
     const waveInfo = engine
         ? (() => {
             const cfg = engine.getWaveConfig(gameState.wave);
-            const density = engine.getMobDensityMultiplier();
-            const waveCountScale = engine.getWaveMobCountScale ? engine.getWaveMobCountScale(gameState.wave) : 1;
             const affixes = engine.getWaveAffixes ? engine.getWaveAffixes(gameState.wave) : [];
             const speedUp = affixes.find((a) => a.id === 'move_speed_up')?.value || 0;
             const hpUp = affixes.find((a) => a.id === 'hp_percent_up')?.value || 0;
             const hp = 10 * gameState.wave * engine.getMobHpMultiplier() * engine.getWaveHpScale(gameState.wave) * (1 + hpUp);
+            const spawnTarget = engine.getWaveSpawnTarget ? engine.getWaveSpawnTarget(gameState.wave) : Math.max(1, cfg.count);
+            const bossCount = engine.getWaveBossCount ? engine.getWaveBossCount(gameState.wave, spawnTarget) : 1;
             return {
                 type: cfg.type,
-                spawnTarget: Math.max(1, Math.floor(cfg.count * waveCountScale * density)),
-                bossCount: 1,
+                spawnTarget,
+                bossCount,
                 spawned: engine.mobsSpawned || 0,
                 alive: engine.mobs.length || 0,
                 hpScale: engine.getWaveHpScale(gameState.wave),
@@ -1525,17 +1588,17 @@ const Game = ({ onExit }) => {
         ? (() => {
             const nextWave = gameState.wave + 1;
             const cfg = engine.getWaveConfig(nextWave);
-            const density = engine.getMobDensityMultiplier();
-            const waveCountScale = engine.getWaveMobCountScale ? engine.getWaveMobCountScale(nextWave) : 1;
             const affixes = engine.getWaveAffixes ? engine.getWaveAffixes(nextWave) : [];
             const speedUp = affixes.find((a) => a.id === 'move_speed_up')?.value || 0;
             const hpUp = affixes.find((a) => a.id === 'hp_percent_up')?.value || 0;
             const hp = 10 * nextWave * engine.getMobHpMultiplier() * engine.getWaveHpScale(nextWave) * (1 + hpUp);
+            const spawnTarget = engine.getWaveSpawnTarget ? engine.getWaveSpawnTarget(nextWave) : Math.max(1, cfg.count);
+            const bossCount = engine.getWaveBossCount ? engine.getWaveBossCount(nextWave, spawnTarget) : 1;
             return {
                 wave: nextWave,
                 type: cfg.type,
-                spawnTarget: Math.max(1, Math.floor(cfg.count * waveCountScale * density)),
-                bossCount: 1,
+                spawnTarget,
+                bossCount,
                 hpScale: engine.getWaveHpScale(nextWave),
                 hp: Math.floor(hp),
                 speed: 2.0 * (1 + speedUp),
@@ -1720,6 +1783,11 @@ const Game = ({ onExit }) => {
                                             </div>
                                         </>
                                     )}
+                                    {selectedTowerDetail.resonanceNames?.length > 0 && (
+                                        <div style={{ color: '#9ad7ff' }}>
+                                            共鳴: {selectedTowerDetail.resonanceNames.join('、')}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div style={{ borderLeft: '1px solid #2f2f2f', paddingLeft: '10px', overflow: 'hidden', minWidth: 0 }}>
@@ -1781,6 +1849,9 @@ const Game = ({ onExit }) => {
                                     )}
                                     {row.equipmentName && (
                                         <div style={{ color: '#9ad7ff' }}>裝備: {row.equipmentName}</div>
+                                    )}
+                                    {row.resonanceNames?.length > 0 && (
+                                        <div style={{ color: '#9ad7ff' }}>共鳴: {row.resonanceNames.join('、')}</div>
                                     )}
                                 </div>
                             ))
@@ -2130,8 +2201,12 @@ const Game = ({ onExit }) => {
                                     return (
                                         <button
                                             key={`inv-slot-${inventoryTab}-${activeInventoryPage}-${idx}`}
-                                            onClick={() => {
+                                            onClick={(e) => {
                                                 if (!stack) return;
+                                                if (stack.id === 'repair_kit' && e.detail < 2) {
+                                                    appendConsoleLog('急救套件：連點兩下可立即使用');
+                                                    return;
+                                                }
                                                 if (tryUseGlobalItem(stack.id)) return;
                                                 setSelectedItemId((prev) => (prev === stack.id ? null : stack.id));
                                             }}
@@ -2368,8 +2443,12 @@ const Game = ({ onExit }) => {
                                     {mobileVisibleInventorySlots.map((stack, idx) => (
                                         <button
                                             key={`mobile-inv-slot-${inventoryTab}-${activeInventoryPage}-${idx}`}
-                                            onClick={() => {
+                                            onClick={(e) => {
                                                 if (!stack) return;
+                                                if (stack.id === 'repair_kit' && e.detail < 2) {
+                                                    appendConsoleLog('急救套件：連點兩下可立即使用');
+                                                    return;
+                                                }
                                                 if (tryUseGlobalItem(stack.id)) return;
                                                 setSelectedItemId((prev) => (prev === stack.id ? null : stack.id));
                                             }}
@@ -2482,6 +2561,9 @@ const Game = ({ onExit }) => {
                                                 {row.equipmentName && (
                                                     <div style={{ color: '#9ad7ff' }}>裝備: {row.equipmentName}</div>
                                                 )}
+                                                {row.resonanceNames?.length > 0 && (
+                                                    <div style={{ color: '#9ad7ff' }}>共鳴: {row.resonanceNames.join('、')}</div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -2531,5 +2613,7 @@ const Game = ({ onExit }) => {
 };
 
 export default Game;
+
+
 
 

@@ -1,6 +1,6 @@
 ﻿
 import { TOWER_TYPES, MONSTER_TYPES, WAVE_CONFIG, TALENTS, RESOURCES } from '../data/constants';
-import { ITEM_DEFS, ITEM_TYPES, MONSTER_ITEM_DROP_TABLE } from '../data/items';
+import { ITEM_DEFS, ITEM_TYPES, MONSTER_ITEM_DROP_TABLE, BOSS_EXTRA_DROP_TABLE } from '../data/items';
 
 export class GameEngine {
     constructor(grid, path, talents, events) {
@@ -22,7 +22,7 @@ export class GameEngine {
 
         this.wave = 1;
         this.gold = 200 + (this.getTalentValue('initial_gold') || 0);
-        this.maxHp = 1 + Math.max(0, Math.floor(this.getTalentValue('player_max_hp')));
+        this.maxHp = 5 + Math.max(0, Math.floor(this.getTalentValue('player_max_hp')));
         this.hp = this.maxHp;
         this.victory = false;
 
@@ -34,7 +34,18 @@ export class GameEngine {
         this.paused = false;
         this.lastTime = 0;
         this.userGameSpeed = 1;
-        this.globalMasteries = {
+        this.globalMasteries = this.getDefaultGlobalMasteries();
+        this.waveAffixCache = {};
+        this.waveTypeCache = {};
+        this.waveResonanceHintCache = {};
+        this.lastPlaceTowerError = null;
+        this.towerLimitBonus = 0;
+
+        console.log("GameEngine Initialized", { pathLength: path?.length, wave: this.wave });
+    }
+
+    getDefaultGlobalMasteries() {
+        return {
             speedAura: false,
             fireMastery: false,
             waterMastery: false,
@@ -47,14 +58,22 @@ export class GameEngine {
             poisonTickRateMult: 1,
             poisonSlowPct: 0,
             critAura: false,
-            critDmgAura: false
+            critDmgAura: false,
+            baseDamageAuraMult: 1,
+            attackSpeedAuraMult: 1,
+            critChanceAuraBonus: 0,
+            critDmgAuraBonus: 0,
+            itemDropRateBonus: 0,
+            woodBaseAura: false,
+            woodCritDmgAura: false,
+            waterBaseAura: false,
+            waterSpeedAura: false,
+            fireSpeedAura: false,
+            fireCritAura: false,
+            bleedSpeedAura: false,
+            bleedBaseAura: false,
+            itemDropAura: false
         };
-        this.waveAffixCache = {};
-        this.waveTypeCache = {};
-        this.lastPlaceTowerError = null;
-        this.towerLimitBonus = 0;
-
-        console.log("GameEngine Initialized", { pathLength: path?.length, wave: this.wave });
     }
 
     getWaveAffixProgress(wave) {
@@ -145,6 +164,48 @@ export class GameEngine {
                 desc: `承受擊退效果減少 ${(resist * 100).toFixed(0)}%`
             };
         }
+        if (id === 'mob_count_up') {
+            if (wave < 30) return null;
+            const mult = 1.25 + (Math.random() * (3.0 - 1.25));
+            return {
+                id,
+                name: '怪物數量增加',
+                value: mult,
+                desc: `怪物數量提升 x${mult.toFixed(2)}`
+            };
+        }
+        if (id === 'boss_count_up') {
+            if (wave < 30) return null;
+            const extraBoss = 1 + Math.floor(Math.random() * 5);
+            return {
+                id,
+                name: 'BOSS數量增加',
+                value: extraBoss,
+                desc: `額外 BOSS +${extraBoss}`
+            };
+        }
+        if (id === 'frostbite_dmg_reduction') {
+            if (wave < 10) return null;
+            const progress = Math.max(0, Math.min(1, (wave - 10) / 90));
+            const reduction = 0.1 + ((0.95 - 0.1) * progress);
+            return {
+                id,
+                name: '凍傷傷害減免',
+                value: reduction,
+                desc: `凍傷增傷效果減少 ${(reduction * 100).toFixed(0)}%`
+            };
+        }
+        if (id === 'scorch_dmg_reduction') {
+            if (wave < 10) return null;
+            const progress = Math.max(0, Math.min(1, (wave - 10) / 90));
+            const reduction = 0.1 + ((0.95 - 0.1) * progress);
+            return {
+                id,
+                name: '灼燒傷害減免',
+                value: reduction,
+                desc: `灼燒傷害減少 ${(reduction * 100).toFixed(0)}%`
+            };
+        }
         return null;
     }
 
@@ -162,11 +223,36 @@ export class GameEngine {
             elemental_dmg_reduction: 10,
             move_speed_up: 30,
             hp_percent_up: 40,
-            knockback_resist: 40
+            knockback_resist: 40,
+            mob_count_up: 10,
+            boss_count_up: 10,
+            frostbite_dmg_reduction: 10,
+            scorch_dmg_reduction: 10
         };
     }
 
+    getWaveAffixTargetCount(wave) {
+        const safeWave = Math.max(1, Math.floor(wave || 1));
+        if (safeWave <= 10) return 0;
+        return Math.max(1, Math.floor(safeWave / 10));
+    }
+
+    getAffixControlGroup(id) {
+        if (id === 'slow_resist_cap') return 'slow';
+        if (id === 'stun_hardness' || id === 'stun_duration_reduction') return 'stun';
+        if (id === 'palsy_resist_cap') return 'palsy';
+        if (id === 'knockback_resist') return 'knockback';
+        return null;
+    }
+
+    canRepeatAffixId(id, wave) {
+        const safeWave = Math.max(1, Math.floor(wave || 1));
+        if (safeWave < 30) return false;
+        return id === 'move_speed_up' || id === 'hp_percent_up';
+    }
+
     pickWeightedAffixIds(count, wave) {
+        const safeWave = Math.max(1, Math.floor(wave || 1));
         const weights = this.getWaveAffixWeights();
         const entries = Object.entries(weights)
             .filter(([, weight]) => weight > 0)
@@ -174,40 +260,59 @@ export class GameEngine {
             .map(([id, weight]) => ({ id, weight }));
 
         const picks = [];
+        const pickedIdCounts = {};
+        const pickedControlGroups = new Set();
+
         while (picks.length < count && entries.length > 0) {
-            const totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
+            const candidates = entries.filter((entry) => {
+                const id = entry.id;
+                const alreadyPicked = (pickedIdCounts[id] || 0) > 0;
+                if (alreadyPicked && !this.canRepeatAffixId(id, safeWave)) {
+                    return false;
+                }
+                if (safeWave >= 30) {
+                    const controlGroup = this.getAffixControlGroup(id);
+                    if (controlGroup && pickedControlGroups.has(controlGroup)) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+
+            if (candidates.length <= 0) break;
+
+            const totalWeight = candidates.reduce((sum, entry) => sum + entry.weight, 0);
             let roll = Math.random() * totalWeight;
             let index = 0;
-            for (let i = 0; i < entries.length; i++) {
-                roll -= entries[i].weight;
+            for (let i = 0; i < candidates.length; i++) {
+                roll -= candidates[i].weight;
                 if (roll <= 0) {
                     index = i;
                     break;
                 }
             }
-            picks.push(entries[index].id);
-            entries.splice(index, 1);
+            const picked = candidates[index];
+            picks.push(picked.id);
+            pickedIdCounts[picked.id] = (pickedIdCounts[picked.id] || 0) + 1;
+
+            const controlGroup = this.getAffixControlGroup(picked.id);
+            if (safeWave >= 30 && controlGroup) {
+                pickedControlGroups.add(controlGroup);
+            }
+
+            if (!this.canRepeatAffixId(picked.id, safeWave)) {
+                const baseIndex = entries.findIndex((entry) => entry.id === picked.id);
+                if (baseIndex >= 0) {
+                    entries.splice(baseIndex, 1);
+                }
+            }
         }
 
         return picks;
     }
 
     rollWaveAffixes(wave) {
-        if (wave <= 10) return [];
-
-        const affixCount = (() => {
-            if (wave >= 31) {
-                let count = 2;
-                if (Math.random() < 0.35) count += 1;
-                return count;
-            }
-            if (wave >= 21) {
-                let count = 1;
-                if (Math.random() < 0.35) count += 1;
-                return count;
-            }
-            return Math.random() < 0.35 ? 1 : 0;
-        })();
+        const affixCount = this.getWaveAffixTargetCount(wave);
 
         if (affixCount <= 0) return [];
         const pickedIds = this.pickWeightedAffixIds(affixCount, wave);
@@ -227,6 +332,139 @@ export class GameEngine {
             map[affix.id] = affix.value;
         }
         return map;
+    }
+
+    getControlResistMultiplier(mob, controlType) {
+        if (!mob || !controlType) return 1;
+        const stacks = Math.max(0, mob.controlResistStacks?.[controlType] || 0);
+        return Math.max(0.35, Math.pow(0.8, stacks));
+    }
+
+    registerControlEffect(mob, controlType) {
+        if (!mob || !controlType) return;
+        mob.controlResistStacks = mob.controlResistStacks || {};
+        mob.controlResistTimers = mob.controlResistTimers || {};
+        const nextStacks = Math.min(8, (mob.controlResistStacks[controlType] || 0) + 1);
+        mob.controlResistStacks[controlType] = nextStacks;
+        mob.controlResistTimers[controlType] = 5;
+    }
+
+    getResonanceCatalog() {
+        return [
+            {
+                id: 'res_swamp_chain_control',
+                name: '沼雷渦流',
+                desc: '沼澤+緩速塔+閃電：緩速/連鎖強化',
+                condition: (tower, terrain) => terrain === 'swamp' && tower?.type === 'projectile_slow' && tower?.equipmentId === 'chain_lightning',
+                effects: { slowEffectMult: 1.2, chainLightningDamageMult: 1.35, chainLightningChainBonus: 6, chainLightningParalyzeBonus: 0.05 }
+            },
+            {
+                id: 'res_highland_archer_courage',
+                name: '高地鷹眼',
+                desc: '高地+弓箭塔+勇氣戰旗：暴擊與傷害提升',
+                condition: (tower, terrain) => terrain === 'highland' && tower?.type === 'projectile' && tower?.equipmentId === 'courage_banner',
+                effects: { damageMult: 1.15, critChanceBonus: 0.2 }
+            },
+            {
+                id: 'res_desert_artillery_firepower',
+                name: '焦土重砲',
+                desc: '沙地+砲擊塔+火力全開：砲擊與擊退強化',
+                condition: (tower, terrain) => terrain === 'desert' && tower?.type === 'projectile_aoe' && tower?.equipmentId === 'full_firepower',
+                effects: { damageMult: 1.3, knockbackDistanceMult: 1.2, knockbackRadiusBonus: 1 }
+            },
+            {
+                id: 'res_forest_melee_slaughter',
+                name: '森血狩獵',
+                desc: '森林+近戰塔+殺戮戰旗：流血強化',
+                condition: (tower, terrain) => terrain === 'forest' && tower?.type === 'melee' && tower?.equipmentId === 'slaughter_banner',
+                effects: { bleedDamageMult: 1.8, bleedDurationBonus: 2, critDmgBonus: 0.25 }
+            },
+            {
+                id: 'res_ruins_magic_chain',
+                name: '遺跡雷術',
+                desc: '遺跡+法術塔+閃電：施法與連鎖強化',
+                condition: (tower, terrain) => terrain === 'ruins' && tower?.type === 'magic' && tower?.equipmentId === 'chain_lightning',
+                effects: { speedMult: 1.15, chainLightningDamageMult: 1.2, chainLightningParalyzeBonus: 0.04 }
+            },
+            {
+                id: 'res_plain_melee_agility',
+                name: '平原突襲',
+                desc: '平原+近戰塔+敏捷戰旗：攻速與傷害提升',
+                condition: (tower, terrain) => terrain === 'plain' && tower?.type === 'melee' && tower?.equipmentId === 'agility_banner',
+                effects: { speedMult: 1.2, damageMult: 1.15 }
+            }
+        ];
+    }
+
+    getTowerResonanceEffects(tower) {
+        const base = {
+            damageMult: 1,
+            speedMult: 1,
+            critChanceBonus: 0,
+            critDmgBonus: 0,
+            chainBonus: 0,
+            slowEffectMult: 1,
+            knockbackDistanceMult: 1,
+            knockbackRadiusBonus: 0,
+            knockbackStunBonus: 0,
+            bleedDamageMult: 1,
+            bleedDurationBonus: 0,
+            chainLightningDamageMult: 1,
+            chainLightningChainBonus: 0,
+            chainLightningParalyzeBonus: 0,
+            chainLightningParalyzeDurationBonus: 0
+        };
+        if (!tower) return base;
+
+        const terrain = tower.terrain || this.getCellAtWorld(tower.x, tower.y)?.terrain;
+        if (!terrain) return base;
+
+        const activeIds = [];
+        for (const resonance of this.getResonanceCatalog()) {
+            if (!resonance.condition?.(tower, terrain)) continue;
+            activeIds.push(resonance.id);
+            const fx = resonance.effects || {};
+            if (fx.damageMult) base.damageMult *= fx.damageMult;
+            if (fx.speedMult) base.speedMult *= fx.speedMult;
+            base.critChanceBonus += fx.critChanceBonus || 0;
+            base.critDmgBonus += fx.critDmgBonus || 0;
+            base.chainBonus += fx.chainBonus || 0;
+            if (fx.slowEffectMult) base.slowEffectMult *= fx.slowEffectMult;
+            if (fx.knockbackDistanceMult) base.knockbackDistanceMult *= fx.knockbackDistanceMult;
+            base.knockbackRadiusBonus += fx.knockbackRadiusBonus || 0;
+            base.knockbackStunBonus += fx.knockbackStunBonus || 0;
+            if (fx.bleedDamageMult) base.bleedDamageMult *= fx.bleedDamageMult;
+            base.bleedDurationBonus += fx.bleedDurationBonus || 0;
+            if (fx.chainLightningDamageMult) base.chainLightningDamageMult *= fx.chainLightningDamageMult;
+            base.chainLightningChainBonus += fx.chainLightningChainBonus || 0;
+            base.chainLightningParalyzeBonus += fx.chainLightningParalyzeBonus || 0;
+            base.chainLightningParalyzeDurationBonus += fx.chainLightningParalyzeDurationBonus || 0;
+        }
+
+        base.activeIds = activeIds;
+        return base;
+    }
+
+    getWaveResonanceHints(wave) {
+        const safeWave = Math.max(1, Math.floor(wave || 1));
+        if (!this.waveResonanceHintCache[safeWave]) {
+            const pool = this.getResonanceCatalog().map((r) => ({
+                id: r.id,
+                name: r.name,
+                desc: r.desc
+            }));
+            if (pool.length <= 2) {
+                this.waveResonanceHintCache[safeWave] = pool;
+            } else {
+                const first = (safeWave * 3) % pool.length;
+                const second = (safeWave * 5 + 1) % pool.length;
+                const hints = [pool[first]];
+                if (second !== first) hints.push(pool[second]);
+                else hints.push(pool[(second + 1) % pool.length]);
+                this.waveResonanceHintCache[safeWave] = hints;
+            }
+        }
+        return this.waveResonanceHintCache[safeWave];
     }
 
     getTalentValue(id) {
@@ -332,8 +570,10 @@ export class GameEngine {
         const now = performance.now();
         const dt = (now - this.lastTime) / 1000;
 
-        // Safety cap dt to prevent huge jumps if tab was backgrounded or lag spike
-        const safeDt = Math.min(dt, 0.1) * this.getGameSpeedMultiplier();
+        // Foreground keeps tighter cap; background allows larger dt so tab switching still advances waves.
+        const hidden = (typeof document !== 'undefined' && !!document.hidden);
+        const dtCap = hidden ? 1.0 : 0.1;
+        const safeDt = Math.min(dt, dtCap) * this.getGameSpeedMultiplier();
 
         this.lastTime = now;
 
@@ -341,7 +581,8 @@ export class GameEngine {
 
         if (this.events.requestDraw) this.events.requestDraw();
 
-        requestAnimationFrame(() => this.loop());
+        // Use timer-driven simulation loop so game logic can continue in background tabs.
+        window.setTimeout(() => this.loop(), 16);
     }
 
     update(dt) {
@@ -394,17 +635,16 @@ export class GameEngine {
 
     updateSpawning(dt) {
         const config = this.getWaveConfig(this.wave);
-
         const densityMultiplier = this.getMobDensityMultiplier();
-        const waveCountScale = this.getWaveMobCountScale(this.wave);
-        const waveCount = Math.max(1, Math.floor(config.count * waveCountScale * densityMultiplier));
-        const spawnInterval = 1.0 / densityMultiplier;
+        const waveCount = this.getWaveSpawnTarget(this.wave);
+        const bossCount = this.getWaveBossCount(this.wave, waveCount);
+        const spawnInterval = 1.0 / Math.max(1, densityMultiplier);
 
         if (this.mobsSpawned < waveCount) {
             this.spawnTimer -= dt;
             if (this.spawnTimer <= 0) {
                 console.log("Spawning Mob...", this.mobsSpawned + 1, "/", waveCount);
-                const isBoss = this.mobsSpawned === waveCount - 1;
+                const isBoss = this.mobsSpawned >= (waveCount - bossCount);
                 this.spawnMob(config.type, { isBoss });
                 this.mobsSpawned++;
                 this.spawnTimer = spawnInterval;
@@ -442,6 +682,13 @@ export class GameEngine {
             speed: 2 * bossSpeedMultiplier * (1 + moveSpeedUp),
             slowTimer: 0,
             slowMultiplier: 1,
+            frostbiteStacks: 0,
+            frostbiteTimer: 0,
+            scorchStacks: 0,
+            scorchTimer: 0,
+            scorchAvgHit: 0,
+            scorchSamples: 0,
+            scorchTickTimer: 1,
             stunTimer: 0,
             stunHardnessWindow: 0,
             stunHardnessApplied: 0,
@@ -451,7 +698,9 @@ export class GameEngine {
             x: this.path[0].x,
             y: this.path[0].y,
             affixes: waveAffixes,
-            affixMap: waveAffixMap
+            affixMap: waveAffixMap,
+            controlResistStacks: { slow: 0, stun: 0, palsy: 0, knockback: 0 },
+            controlResistTimers: { slow: 0, stun: 0, palsy: 0, knockback: 0 }
         };
 
         console.log("Mob Spawned:", isBoss ? "boss" : "mob", newMob.type, "at", newMob.x, newMob.y);
@@ -545,10 +794,12 @@ export class GameEngine {
         this.towers.forEach(tower => {
             if (tower?.stats?.type === 'support') return;
             const terrainMods = this.getTowerTerrainModifiers(tower);
+            const resonance = this.getTowerResonanceEffects(tower);
             const globalSpeedMult = this.globalMasteries.speedAura ? 1.1 : 1.0;
             const towerSpeedMult = tower.masterySpeedMult || 1.0;
             const auraBonus = this.getBannerAuraBonuses(tower);
-            const effectiveSpeed = Math.max(0.01, tower.stats.speed * terrainMods.speedMult * globalSpeedMult * towerSpeedMult * (1 + auraBonus.speedPct));
+            const globalAuraSpeedMult = this.globalMasteries.attackSpeedAuraMult || 1;
+            const effectiveSpeed = Math.max(0.01, tower.stats.speed * terrainMods.speedMult * resonance.speedMult * globalSpeedMult * globalAuraSpeedMult * towerSpeedMult * (1 + auraBonus.speedPct));
             tower.cooldown -= dt;
             if (tower.cooldown <= 0) {
                 const targets = this.findTargets(tower, this.getAttackTargetCount(tower));
@@ -573,7 +824,8 @@ export class GameEngine {
         if (tower?.stats?.type === 'magic') {
             return 0;
         }
-        return Math.max(0, Math.floor(this.getTowerTalentValue(tower?.type, 'chain'))) + (tower?.bonusChain || 0);
+        const resonance = this.getTowerResonanceEffects(tower);
+        return Math.max(0, Math.floor(this.getTowerTalentValue(tower?.type, 'chain'))) + (tower?.bonusChain || 0) + Math.max(0, Math.floor(resonance.chainBonus || 0));
     }
 
     findTargets(tower, maxTargets = 1) {
@@ -619,6 +871,7 @@ export class GameEngine {
 
     fireTower(tower, targets) {
         const terrainMods = this.getTowerTerrainModifiers(tower);
+        const resonance = this.getTowerResonanceEffects(tower);
         if (Math.random() < terrainMods.missChance) {
             this.floatingTexts.push({
                 x: tower.x,
@@ -635,19 +888,23 @@ export class GameEngine {
 
         const globalCritBonus = this.globalMasteries.critAura ? 0.2 : 0;
         const auraBonus = this.getBannerAuraBonuses(tower);
-        const critChance = Math.max(0, Math.min(1, tower.stats.crit + terrainMods.critBonus + globalCritBonus + auraBonus.critChance));
+        const globalCritChanceBonus = this.globalMasteries.critChanceAuraBonus || 0;
+        const critChance = Math.max(0, Math.min(1, tower.stats.crit + terrainMods.critBonus + resonance.critChanceBonus + globalCritBonus + globalCritChanceBonus + auraBonus.critChance));
+        const globalBaseDamageMult = this.globalMasteries.baseDamageAuraMult || 1;
         const damage = {
-            base: tower.stats.damage * terrainMods.damageMult * auraBonus.damageMult,
-            fire: (tower.stats.extraFire || 0) * terrainMods.damageMult * auraBonus.damageMult,
-            water: (tower.stats.extraWater || 0) * terrainMods.damageMult * auraBonus.damageMult,
-            wood: (tower.stats.extraWood || 0) * terrainMods.damageMult * auraBonus.damageMult,
+            base: tower.stats.damage * globalBaseDamageMult * terrainMods.damageMult * resonance.damageMult * auraBonus.damageMult,
+            fire: (tower.stats.extraFire || 0) * terrainMods.damageMult * resonance.damageMult * auraBonus.damageMult,
+            water: (tower.stats.extraWater || 0) * terrainMods.damageMult * resonance.damageMult * auraBonus.damageMult,
+            wood: (tower.stats.extraWood || 0) * terrainMods.damageMult * resonance.damageMult * auraBonus.damageMult,
         };
-        if (tower.magicElement) {
+        const magicElements = this.getTowerMagicElements(tower);
+        if (magicElements.length > 0) {
             const baseVal = damage.base;
             damage.base = 0;
-            if (tower.magicElement === 'fire') damage.fire += baseVal;
-            if (tower.magicElement === 'water') damage.water += baseVal;
-            if (tower.magicElement === 'wood') damage.wood += baseVal;
+            const split = baseVal / magicElements.length;
+            if (magicElements.includes('fire')) damage.fire += split;
+            if (magicElements.includes('water')) damage.water += split;
+            if (magicElements.includes('wood')) damage.wood += split;
         }
         if (tower.disableAttributes) {
             damage.fire = 0;
@@ -677,24 +934,26 @@ export class GameEngine {
             const isCrit = Math.random() < critChance;
             targets.forEach((target) => {
                 this.addEffect(target.x + 0.5, target.y + 0.5, 'magic_orb', { life: 0.12, maxLife: 0.12 });
-                if (!tower.magicElement) {
+                if (magicElements.length <= 0) {
                     this.addEffect(target.x + 0.5, target.y + 0.5, 'magic_burst', { life: 0.28, maxLife: 0.28 });
-                } else if (tower.magicElement === 'fire') {
+                } else if (magicElements.length === 1 && magicElements[0] === 'fire') {
                     this.addEffect(target.x + 0.5, target.y + 0.5, 'fire_burst', { life: 0.28, maxLife: 0.28 });
-                } else if (tower.magicElement === 'water') {
+                } else if (magicElements.length === 1 && magicElements[0] === 'water') {
                     this.addEffect(target.x + 0.5, target.y + 0.5, 'water_burst', { life: 0.3, maxLife: 0.3 });
-                } else if (tower.magicElement === 'wood') {
+                } else if (magicElements.length === 1 && magicElements[0] === 'wood') {
                     this.addEffect(target.x + 0.5, target.y + 0.5, 'wood_burst', { life: 0.35, maxLife: 0.35 });
+                } else {
+                    this.addEffect(target.x + 0.5, target.y + 0.5, 'magic_burst', { life: 0.32, maxLife: 0.32 });
                 }
-                this.damageMob(target, damage, tower, isCrit);
-                this.applyOnHitEffects(target, tower);
+                const dealt = this.damageMob(target, damage, tower, isCrit);
+                this.applyOnHitEffects(target, tower, dealt);
             });
         } else {
             const isCrit = Math.random() < critChance;
             targets.forEach((target) => {
                 this.addEffect(target.x + 0.5, target.y + 0.5, 'slash');
-                this.damageMob(target, damage, tower, isCrit);
-                this.applyOnHitEffects(target, tower);
+                const dealt = this.damageMob(target, damage, tower, isCrit);
+                this.applyOnHitEffects(target, tower, dealt);
                 if (tower.type === 'melee' && (tower.additionalAttackCount || 0) > 0) {
                     const extraTimes = Math.max(0, tower.additionalAttackCount || 0);
                     for (let i = 0; i < extraTimes; i++) {
@@ -733,8 +992,8 @@ export class GameEngine {
             if (dist < 0.5) {
                 if (canHit) {
                     this.addEffect(target.x + 0.5, target.y + 0.5, 'hit');
-                    this.damageMob(target, this.scaleDamage(p.damage, p.chainMultiplier || 1), p.sourceTower, p.crit);
-                    this.applyOnHitEffects(target, p.sourceTower);
+                    const dealt = this.damageMob(target, this.scaleDamage(p.damage, p.chainMultiplier || 1), p.sourceTower, p.crit);
+                    this.applyOnHitEffects(target, p.sourceTower, dealt);
                 }
 
                 if (canHit && (p.remainingChains || 0) > 0) {
@@ -775,10 +1034,11 @@ export class GameEngine {
 
     damageMob(mob, damageObj, tower, isCrit) {
         let totalDamage = 0;
-        const globalCritDmgBonus = this.globalMasteries.critDmgAura ? 0.2 : 0;
+        const globalCritDmgBonus = (this.globalMasteries.critDmgAura ? 0.2 : 0) + (this.globalMasteries.critDmgAuraBonus || 0);
         const auraBonus = tower ? this.getBannerAuraBonuses(tower) : { critDmgBonus: 0, luckCritDmgBonus: 0 };
+        const resonance = tower ? this.getTowerResonanceEffects(tower) : { critDmgBonus: 0 };
         let critMult = isCrit
-            ? ((tower?.stats?.critDmg || 2.0) + globalCritDmgBonus + (auraBonus.critDmgBonus || 0) + (auraBonus.luckCritDmgBonus || 0))
+            ? ((tower?.stats?.critDmg || 2.0) + globalCritDmgBonus + (auraBonus.critDmgBonus || 0) + (auraBonus.luckCritDmgBonus || 0) + (resonance.critDmgBonus || 0))
             : 1.0;
         if (isCrit && tower?.randomCritBonus) {
             critMult += (0.1 + (Math.random() * 9.9));
@@ -814,6 +1074,25 @@ export class GameEngine {
             }
             if ((typeId === 'fire' || typeId === 'water' || typeId === 'wood') && (mob.affixMap?.elemental_dmg_reduction || 0) > 0) {
                 finalVal *= (1 - mob.affixMap.elemental_dmg_reduction);
+            }
+
+            const ailmentTerrainMods = this.getMobAilmentTerrainModifiers(mob);
+            const frostbiteStacks = Math.max(0, mob.frostbiteStacks || 0);
+            if (frostbiteStacks > 0) {
+                const frostbiteReduction = Math.max(0, Math.min(0.95, mob.affixMap?.frostbite_dmg_reduction || 0));
+                const frostbiteBonus = frostbiteStacks * ailmentTerrainMods.frostbitePerStack * (1 - frostbiteReduction);
+                finalVal *= (1 + Math.max(0, frostbiteBonus));
+            }
+
+            const equipmentLevel = this.getTowerEquipmentLevel(tower);
+            if (tower?.equipmentId === 'giant_slayer' && mob?.isBoss) {
+                finalVal *= (1 + (0.6 * Math.max(1, equipmentLevel)));
+            }
+            if (tower?.equipmentId === 'executioner_axe' && mob?.maxHp > 0 && (mob.hp / mob.maxHp) <= 0.35) {
+                finalVal *= (1 + (0.5 * Math.max(1, equipmentLevel)));
+            }
+            if (tower?.equipmentId === 'last_stand_emblem' && this.hp <= 1) {
+                finalVal *= (1 + (0.35 * Math.max(1, equipmentLevel)));
             }
 
             totalDamage += finalVal;
@@ -876,9 +1155,18 @@ export class GameEngine {
 
         if (!tower) return;
 
+        const equipmentLevel = this.getTowerEquipmentLevel(tower);
         if (tower.equipmentId === 'absorption_force') {
             tower.absorptionKillCount = (tower.absorptionKillCount || 0) + 1;
-            tower.stats.damage = (tower.stats.damage || 0) + 1;
+            tower.stats.damage = (tower.stats.damage || 0) + Math.max(1, equipmentLevel);
+        }
+        const luckyChance = Math.min(0.6, 0.12 + (0.04 * Math.max(0, equipmentLevel - 1)));
+        if (tower.equipmentId === 'lucky_coin' && Math.random() < luckyChance && typeDef) {
+            this.events.onResourceDrop(typeDef.resource, 1);
+        }
+        const vampireChance = Math.min(0.8, 0.25 + (0.1 * Math.max(0, equipmentLevel - 1)));
+        if (tower.equipmentId === 'vampire_fang' && this.hp < this.maxHp && Math.random() < vampireChance) {
+            this.hp = Math.min(this.maxHp, this.hp + 1);
         }
 
         this.grantSupportExpFromNearbyKill(tower);
@@ -896,16 +1184,21 @@ export class GameEngine {
     rollItemDrop(mob) {
         if (!mob || !this.events?.onItemDrop) return;
         const table = MONSTER_ITEM_DROP_TABLE[mob.type] || [];
-        const itemDropMult = 1 + Math.max(0, this.getTalentValue('item_drop_rate'));
-
+        const itemDropMult = 1 + Math.max(0, this.getTalentValue('item_drop_rate')) + Math.max(0, this.globalMasteries.itemDropRateBonus || 0);
         for (const entry of table) {
-            if (Math.random() < Math.min(1, entry.chance * itemDropMult)) {
+            const chance = Math.min(1, Math.max(0, entry.chance * itemDropMult));
+            if (Math.random() < chance) {
                 this.events.onItemDrop(entry.itemId, 1, mob.type);
             }
         }
 
-        if (mob.isBoss && Math.random() < 0.1) {
-            this.events.onItemDrop('build_book', 1, mob.type);
+        if (mob.isBoss) {
+            for (const entry of BOSS_EXTRA_DROP_TABLE) {
+                const chance = Math.min(1, Math.max(0, entry.chance * itemDropMult));
+                if (Math.random() < chance) {
+                    this.events.onItemDrop(entry.itemId, 1, 'boss_extra');
+                }
+            }
         }
     }
 
@@ -1021,18 +1314,31 @@ export class GameEngine {
                 this.gold += 1000;
                 break;
             case 'trigger_magic':
-                if (!tower.magicElement) return false;
+                if (this.getTowerMagicElements(tower).length <= 0) return false;
                 tower.triggerMagicLevel = (tower.triggerMagicLevel || 0) + 1;
                 break;
             case 'elemental_fire_magic':
             case 'elemental_water_magic':
             case 'elemental_wood_magic': {
                 const nextElement = upgradeType.includes('fire') ? 'fire' : upgradeType.includes('water') ? 'water' : 'wood';
-                if (tower.magicElement && tower.magicElement !== nextElement) return false;
-                tower.magicElement = nextElement;
+                tower.magicElements = tower.magicElements || {};
+                tower.magicElements[nextElement] = (tower.magicElements[nextElement] || 0) + 1;
+                if (!tower.magicElement) tower.magicElement = nextElement;
                 tower.magicElementLevel = (tower.magicElementLevel || 0) + 1;
                 break;
             }
+            case 'magic_wood_poison_talent':
+                if ((tower.magicElements?.wood || 0) <= 0) return false;
+                tower.magicWoodPoisonTalent = (tower.magicWoodPoisonTalent || 0) + 1;
+                break;
+            case 'magic_water_frostbite_talent':
+                if ((tower.magicElements?.water || 0) <= 0) return false;
+                tower.magicWaterFrostbiteTalent = (tower.magicWaterFrostbiteTalent || 0) + 1;
+                break;
+            case 'magic_fire_scorch_talent':
+                if ((tower.magicElements?.fire || 0) <= 0) return false;
+                tower.magicFireScorchTalent = (tower.magicFireScorchTalent || 0) + 1;
+                break;
             default:
                 return false;
         }
@@ -1044,8 +1350,145 @@ export class GameEngine {
         return true;
     }
 
+    createSpecializationSnapshot(tower) {
+        return {
+            stats: { ...(tower.stats || {}) },
+            chainNoLimit: !!tower.chainNoLimit,
+            masterySpeedMult: tower.masterySpeedMult || 1,
+            redistributeKillExp: !!tower.redistributeKillExp,
+            randomCritBonus: !!tower.randomCritBonus,
+            hitStun: tower.hitStun || 0,
+            localFireExplosion: !!tower.localFireExplosion,
+            disableAttributes: !!tower.disableAttributes,
+            bleedDamageMult: tower.bleedDamageMult || 1,
+            bleedDurationOverride: tower.bleedDurationOverride || 0,
+            magicTriggerChanceBonus: tower.magicTriggerChanceBonus || 0,
+            magicAilmentPowerMult: tower.magicAilmentPowerMult || 1,
+            supportAuraDouble: !!tower.supportAuraDouble,
+            supportAuraRangeBonus: tower.supportAuraRangeBonus || 0,
+            supportLuckyAura: !!tower.supportLuckyAura,
+            supportLuckyAuraTimer: tower.supportLuckyAuraTimer || 0,
+            supportLuckyCritDmgBonus: tower.supportLuckyCritDmgBonus || 0
+        };
+    }
+
+    restoreSpecializationSnapshot(tower, snapshot) {
+        if (!tower || !snapshot) return;
+        tower.stats = { ...(snapshot.stats || tower.stats) };
+        tower.chainNoLimit = !!snapshot.chainNoLimit;
+        tower.masterySpeedMult = snapshot.masterySpeedMult || 1;
+        tower.redistributeKillExp = !!snapshot.redistributeKillExp;
+        tower.randomCritBonus = !!snapshot.randomCritBonus;
+        tower.hitStun = snapshot.hitStun || 0;
+        tower.localFireExplosion = !!snapshot.localFireExplosion;
+        tower.disableAttributes = !!snapshot.disableAttributes;
+        tower.bleedDamageMult = snapshot.bleedDamageMult || 1;
+        tower.bleedDurationOverride = snapshot.bleedDurationOverride || 0;
+        tower.magicTriggerChanceBonus = snapshot.magicTriggerChanceBonus || 0;
+        tower.magicAilmentPowerMult = snapshot.magicAilmentPowerMult || 1;
+        tower.supportAuraDouble = !!snapshot.supportAuraDouble;
+        tower.supportAuraRangeBonus = snapshot.supportAuraRangeBonus || 0;
+        tower.supportLuckyAura = !!snapshot.supportLuckyAura;
+        tower.supportLuckyAuraTimer = snapshot.supportLuckyAuraTimer || 0;
+        tower.supportLuckyCritDmgBonus = snapshot.supportLuckyCritDmgBonus || 0;
+    }
+
+    recomputeGlobalMasteriesFromSpecializations() {
+        const next = this.getDefaultGlobalMasteries();
+        for (const tower of this.towers) {
+            if (!tower?.specializationChosen || !tower.specializationId) continue;
+            switch (tower.specializationId) {
+                case 'spec_speed_aura':
+                    next.speedAura = true;
+                    break;
+                case 'spec_fire_global':
+                    next.fireMastery = true;
+                    break;
+                case 'spec_water_global':
+                    next.waterMastery = true;
+                    break;
+                case 'spec_wood_global':
+                    next.woodMastery = true;
+                    next.woodPoisonDurationBonus = Math.max(next.woodPoisonDurationBonus, 5);
+                    break;
+                case 'spec_crit_global':
+                    next.critAura = true;
+                    break;
+                case 'spec_crit_dmg_global':
+                    next.critDmgAura = true;
+                    break;
+                case 'spec_tower_poison':
+                    next.poisonMastery = true;
+                    next.poisonDamageMult = Math.max(next.poisonDamageMult, 3);
+                    next.poisonDurationMin = Math.max(next.poisonDurationMin, 10);
+                    next.poisonSlowPct = Math.max(next.poisonSlowPct, 0.15);
+                    break;
+                case 'spec_tower_poison_frequency':
+                    next.poisonFrequencyMastery = true;
+                    next.poisonTickRateMult = Math.max(next.poisonTickRateMult, 3);
+                    next.poisonSlowPct = Math.max(next.poisonSlowPct, 0.15);
+                    break;
+                case 'spec_global_wood_base':
+                    next.woodBaseAura = true;
+                    next.baseDamageAuraMult *= 1.2;
+                    break;
+                case 'spec_global_wood_crit_dmg':
+                    next.woodCritDmgAura = true;
+                    next.critDmgAuraBonus += 0.25;
+                    break;
+                case 'spec_global_water_base':
+                    next.waterBaseAura = true;
+                    next.baseDamageAuraMult *= 1.2;
+                    break;
+                case 'spec_global_water_speed':
+                    next.waterSpeedAura = true;
+                    next.attackSpeedAuraMult *= 1.12;
+                    break;
+                case 'spec_global_fire_speed':
+                    next.fireSpeedAura = true;
+                    next.attackSpeedAuraMult *= 1.12;
+                    break;
+                case 'spec_global_fire_crit':
+                    next.fireCritAura = true;
+                    next.critChanceAuraBonus += 0.1;
+                    break;
+                case 'spec_global_bleed_speed':
+                    next.bleedSpeedAura = true;
+                    next.attackSpeedAuraMult *= 1.1;
+                    break;
+                case 'spec_global_bleed_base':
+                    next.bleedBaseAura = true;
+                    next.baseDamageAuraMult *= 1.15;
+                    break;
+                case 'support_spec_global_item_drop':
+                    next.itemDropAura = true;
+                    next.itemDropRateBonus = Math.max(next.itemDropRateBonus, 0.15);
+                    break;
+                default:
+                    break;
+            }
+        }
+        this.globalMasteries = next;
+    }
+
+    resetTowerSpecialization(tower) {
+        if (!tower || !tower.specializationChosen) return false;
+        if (tower.level < 10) return false;
+        if (!tower.preSpecializationSnapshot) return false;
+
+        this.restoreSpecializationSnapshot(tower, tower.preSpecializationSnapshot);
+        tower.specializationChosen = false;
+        tower.specializationId = null;
+        tower.pendingSpecialization = true;
+        this.recomputeGlobalMasteriesFromSpecializations();
+        return true;
+    }
+
     applyTowerSpecialization(tower, specId) {
         if (!tower || !tower.pendingSpecialization || tower.specializationChosen) return false;
+        if (!tower.preSpecializationSnapshot) {
+            tower.preSpecializationSnapshot = this.createSpecializationSnapshot(tower);
+        }
 
         if (tower.type === 'support') {
             switch (specId) {
@@ -1072,6 +1515,10 @@ export class GameEngine {
                     tower.supportLuckyAuraTimer = 0;
                     tower.supportLuckyCritDmgBonus = 0;
                     break;
+                case 'support_spec_global_item_drop':
+                    this.globalMasteries.itemDropAura = true;
+                    this.globalMasteries.itemDropRateBonus = Math.max(this.globalMasteries.itemDropRateBonus || 0, 0.15);
+                    break;
                 default:
                     return false;
             }
@@ -1079,6 +1526,7 @@ export class GameEngine {
             tower.pendingSpecialization = false;
             tower.specializationChosen = true;
             tower.specializationId = specId;
+            this.recomputeGlobalMasteriesFromSpecializations();
             return true;
         }
 
@@ -1149,6 +1597,55 @@ export class GameEngine {
                 this.globalMasteries.poisonTickRateMult = Math.max(this.globalMasteries.poisonTickRateMult || 1, 3);
                 this.globalMasteries.poisonSlowPct = Math.max(this.globalMasteries.poisonSlowPct || 0, 0.15);
                 break;
+            case 'spec_global_wood_base':
+                this.globalMasteries.woodBaseAura = true;
+                this.globalMasteries.baseDamageAuraMult = (this.globalMasteries.baseDamageAuraMult || 1) * 1.2;
+                break;
+            case 'spec_global_wood_crit_dmg':
+                this.globalMasteries.woodCritDmgAura = true;
+                this.globalMasteries.critDmgAuraBonus = (this.globalMasteries.critDmgAuraBonus || 0) + 0.25;
+                break;
+            case 'spec_global_water_base':
+                this.globalMasteries.waterBaseAura = true;
+                this.globalMasteries.baseDamageAuraMult = (this.globalMasteries.baseDamageAuraMult || 1) * 1.2;
+                break;
+            case 'spec_global_water_speed':
+                this.globalMasteries.waterSpeedAura = true;
+                this.globalMasteries.attackSpeedAuraMult = (this.globalMasteries.attackSpeedAuraMult || 1) * 1.12;
+                break;
+            case 'spec_global_fire_speed':
+                this.globalMasteries.fireSpeedAura = true;
+                this.globalMasteries.attackSpeedAuraMult = (this.globalMasteries.attackSpeedAuraMult || 1) * 1.12;
+                break;
+            case 'spec_global_fire_crit':
+                this.globalMasteries.fireCritAura = true;
+                this.globalMasteries.critChanceAuraBonus = (this.globalMasteries.critChanceAuraBonus || 0) + 0.1;
+                break;
+            case 'spec_global_bleed_speed':
+                this.globalMasteries.bleedSpeedAura = true;
+                this.globalMasteries.attackSpeedAuraMult = (this.globalMasteries.attackSpeedAuraMult || 1) * 1.1;
+                break;
+            case 'spec_global_bleed_base':
+                this.globalMasteries.bleedBaseAura = true;
+                this.globalMasteries.baseDamageAuraMult = (this.globalMasteries.baseDamageAuraMult || 1) * 1.15;
+                break;
+            case 'spec_magic_wood_base':
+                tower.stats.damage *= 1.35;
+                break;
+            case 'spec_magic_water_frost_trigger':
+                tower.magicTriggerChanceBonus = (tower.magicTriggerChanceBonus || 0) + 0.25;
+                break;
+            case 'spec_magic_fire_speed':
+                tower.masterySpeedMult = (tower.masterySpeedMult || 1) * 1.25;
+                break;
+            case 'spec_magic_combo_wood_fire':
+            case 'spec_magic_combo_fire_water':
+            case 'spec_magic_combo_water_wood':
+                break;
+            case 'spec_magic_dual_ailment':
+                tower.magicTriggerChanceBonus = (tower.magicTriggerChanceBonus || 0) + 0.2;
+                tower.magicAilmentPowerMult = (tower.magicAilmentPowerMult || 1) * 1.4;
+                break;
             default:
                 return false;
         }
@@ -1156,6 +1653,7 @@ export class GameEngine {
         tower.pendingSpecialization = false;
         tower.specializationChosen = true;
         tower.specializationId = specId;
+        this.recomputeGlobalMasteriesFromSpecializations();
         return true;
     }
 
@@ -1206,12 +1704,15 @@ export class GameEngine {
             bleedDamageMult: 1,
             bleedDurationOverride: 0,
             slowPowerLevel: 0,
+            slowAreaRadiusBonus: 0,
+            slowDurationBonus: 0,
             poisonDamageLevel: 0,
             poisonDurationLevel: 0,
             poisonFrequencyLevel: 0,
             upgradeStats: {},
             pendingSpecialization: false,
             specializationChosen: false,
+            preSpecializationSnapshot: null,
             masterySpeedMult: 1,
             redistributeKillExp: false,
             randomCritBonus: false,
@@ -1227,11 +1728,18 @@ export class GameEngine {
             speedMagicLevel: 0,
             triggerMagicLevel: 0,
             magicElement: null,
+            magicElements: { fire: 0, water: 0, wood: 0 },
             magicElementLevel: 0,
+            magicWoodPoisonTalent: 0,
+            magicWaterFrostbiteTalent: 0,
+            magicFireScorchTalent: 0,
+            magicTriggerChanceBonus: 0,
+            magicAilmentPowerMult: 1,
             specializationId: null,
             totalDamageDealt: 0,
             equipmentId: null,
             equipmentName: null,
+            equipmentLevel: 0,
             supportExp: 0,
             supportAuraType: typeId === 'support' ? 'attack' : null,
             supportAttackAuraLevel: 0,
@@ -1259,8 +1767,7 @@ export class GameEngine {
     }
 
     getMobDensityMultiplier() {
-        const level = this.talents.mob_density || 0;
-        return Math.pow(1.4, level);
+        return Math.min(2, 1 + Math.max(0, this.getTalentValue('mob_density')));
     }
 
     getGameSpeedMultiplier() {
@@ -1286,13 +1793,41 @@ export class GameEngine {
         return this.userGameSpeed;
     }
 
+    getMobTypeSelectionWeight(typeId) {
+        if (typeId === 'fire') {
+            return Math.max(0.05, 1 + this.getTalentValue('fire_mob_rate_up') - this.getTalentValue('fire_mob_rate_down'));
+        }
+        if (typeId === 'water') {
+            return Math.max(0.05, 1 + this.getTalentValue('water_mob_rate_up') - this.getTalentValue('water_mob_rate_down'));
+        }
+        if (typeId === 'wood') {
+            return Math.max(0.05, 1 + this.getTalentValue('wood_mob_rate_up') - this.getTalentValue('wood_mob_rate_down'));
+        }
+        return 1;
+    }
+
+    pickWeightedMobType(fallbackType = 'normal') {
+        const entries = Object.values(MONSTER_TYPES).map((m) => ({
+            id: m.id,
+            weight: this.getMobTypeSelectionWeight(m.id)
+        }));
+        const totalWeight = entries.reduce((sum, entry) => sum + Math.max(0, entry.weight), 0);
+        if (totalWeight <= 0) return fallbackType;
+
+        let roll = Math.random() * totalWeight;
+        for (const entry of entries) {
+            roll -= Math.max(0, entry.weight);
+            if (roll <= 0) return entry.id;
+        }
+        return fallbackType;
+    }
+
     getWaveConfig(wave) {
         const direct = WAVE_CONFIG[wave - 1];
         if (direct) return direct;
         const fallback = WAVE_CONFIG[WAVE_CONFIG.length - 1] || { type: 'normal', count: 30 };
         if (!this.waveTypeCache[wave]) {
-            const typePool = Object.values(MONSTER_TYPES).map((m) => m.id);
-            this.waveTypeCache[wave] = typePool[Math.floor(Math.random() * typePool.length)] || fallback.type;
+            this.waveTypeCache[wave] = this.pickWeightedMobType(fallback.type);
         }
         return {
             type: this.waveTypeCache[wave],
@@ -1312,7 +1847,33 @@ export class GameEngine {
 
     getWaveMobCountScale(wave) {
         const safeWave = Math.max(1, Math.floor(wave || 1));
-        return Math.pow(1.1, safeWave - 1);
+        const config = this.getWaveConfig(safeWave);
+        const baseCount = Math.max(1, config?.count || 30);
+        return this.getWaveBaseMobCount(safeWave) / baseCount;
+    }
+
+    getWaveBaseMobCount(wave) {
+        const safeWave = Math.max(1, Math.floor(wave || 1));
+        // Target curve (no talent): W10~20, W20~35, W30~55, W40~80 then cap at 80.
+        const raw = (0.025 * safeWave * safeWave) + (0.75 * safeWave) + 10;
+        return Math.min(80, raw);
+    }
+
+    getWaveSpawnTarget(wave) {
+        const safeWave = Math.max(1, Math.floor(wave || 1));
+        const densityMultiplier = this.getMobDensityMultiplier();
+        const affixMap = this.getWaveAffixMap(safeWave);
+        const mobCountUp = Math.max(1, affixMap.mob_count_up || 1);
+        const count = this.getWaveBaseMobCount(safeWave) * densityMultiplier * mobCountUp;
+        return Math.max(1, Math.floor(count));
+    }
+
+    getWaveBossCount(wave, totalSpawnTarget = null) {
+        const safeWave = Math.max(1, Math.floor(wave || 1));
+        const affixMap = this.getWaveAffixMap(safeWave);
+        const extraBoss = Math.max(0, Math.floor(affixMap.boss_count_up || 0));
+        const total = Math.max(1, Math.floor(totalSpawnTarget || this.getWaveSpawnTarget(safeWave)));
+        return Math.max(1, Math.min(total, 1 + extraBoss));
     }
 
     getTowerAt(gridX, gridY) {
@@ -1339,6 +1900,15 @@ export class GameEngine {
 
     isSupportTower(tower) {
         return tower?.type === 'support' || tower?.stats?.type === 'support';
+    }
+
+    getTowerMagicElements(tower) {
+        if (!tower) return [];
+        const map = tower.magicElements || {};
+        const selected = ['fire', 'water', 'wood'].filter((key) => (map[key] || 0) > 0);
+        if (selected.length > 0) return selected;
+        if (tower.magicElement) return [tower.magicElement];
+        return [];
     }
 
     getSupportAuraRange(tower) {
@@ -1423,6 +1993,29 @@ export class GameEngine {
         return 1;
     }
 
+    getMobAilmentTerrainModifiers(mob) {
+        const terrain = this.getCellAtWorld(mob?.x || 0, mob?.y || 0)?.terrain;
+        const mods = {
+            frostbitePerStack: 0.05,
+            scorchDamageMult: 1,
+            poisonDamageMult: 1
+        };
+
+        if (terrain === 'swamp') {
+            mods.frostbitePerStack *= 1.3;
+            mods.scorchDamageMult *= 0.8;
+        }
+        if (terrain === 'desert') {
+            mods.frostbitePerStack *= 0.8;
+            mods.scorchDamageMult *= 1.4;
+        }
+        if (terrain === 'forest') {
+            mods.poisonDamageMult *= 1.3;
+        }
+
+        return mods;
+    }
+
     getMobPathDirection(mob) {
         const n1 = this.path[mob.pathIndex];
         const n2 = this.path[mob.pathIndex + 1];
@@ -1472,6 +2065,7 @@ export class GameEngine {
 
         const stunReduction = Math.max(0, mob.affixMap?.stun_duration_reduction || 0);
         duration *= Math.max(0, 1 - stunReduction);
+        duration *= this.getControlResistMultiplier(mob, effectType === 'palsy' ? 'palsy' : 'stun');
         if (duration <= 0) return;
 
         if (effectType === 'palsy') {
@@ -1489,6 +2083,7 @@ export class GameEngine {
         }
 
         mob.stunTimer = Math.max(mob.stunTimer || 0, duration);
+        this.registerControlEffect(mob, effectType === 'palsy' ? 'palsy' : 'stun');
         if (effectType === 'palsy') {
             mob.palsyVisualTimer = Math.max(mob.palsyVisualTimer || 0, duration);
             this.addEffect(mob.x + 0.5, mob.y + 0.5, 'palsy_status', { life: 0.25, maxLife: 0.25 });
@@ -1498,11 +2093,12 @@ export class GameEngine {
         }
     }
 
-    applyOnHitEffects(primaryTarget, sourceTower) {
+    applyOnHitEffects(primaryTarget, sourceTower, hitDamage = 0) {
         if (!primaryTarget || !sourceTower) return;
         const sourceBase = sourceTower.stats.damage;
+        const resonance = this.getTowerResonanceEffects(sourceTower);
 
-        if (sourceTower.type === 'melee') {
+        if (sourceTower.type === 'melee' || (sourceTower.bleedLevel || 0) > 0) {
             this.applyBleed(primaryTarget, sourceTower);
         }
 
@@ -1511,10 +2107,10 @@ export class GameEngine {
         }
 
         if (sourceTower.type === 'projectile_aoe' && this.mobs.includes(primaryTarget)) {
-            const aoeRadius = 1 + (sourceTower.knockbackRadiusBonus || 0);
+            const aoeRadius = 1 + (sourceTower.knockbackRadiusBonus || 0) + (resonance.knockbackRadiusBonus || 0);
             const radiusSq = aoeRadius * aoeRadius;
-            const knockbackDist = 0.5 + (sourceTower.knockbackBonus || 0);
-            const knockbackStun = sourceTower.knockbackStun || 0;
+            const knockbackDist = (0.5 + (sourceTower.knockbackBonus || 0)) * (resonance.knockbackDistanceMult || 1);
+            const knockbackStun = (sourceTower.knockbackStun || 0) + (resonance.knockbackStunBonus || 0);
 
             for (const mob of this.mobs) {
                 const dx = mob.x - primaryTarget.x;
@@ -1533,10 +2129,18 @@ export class GameEngine {
             this.applyStun(primaryTarget, sourceTower.hitStun);
         }
 
-        if (this.globalMasteries.waterMastery && Math.random() < 0.25) {
+        if ((sourceTower.upgradeStats?.water_dmg || 0) > 0) {
+            this.applyFrostbite(primaryTarget, 1);
+        }
+
+        if ((sourceTower.upgradeStats?.fire_dmg || 0) > 0) {
+            const sampleHit = Math.max(1, hitDamage || sourceBase);
+            this.applyScorch(primaryTarget, sampleHit, 1);
+        }
+
+        if (this.globalMasteries.waterMastery) {
             this.addEffect(primaryTarget.x + 0.5, primaryTarget.y + 0.5, 'water_aura_proc', { life: 0.32, maxLife: 0.32 });
-            this.applyStun(primaryTarget, 0.15);
-            this.damageMob(primaryTarget, { base: 0, fire: 0, water: sourceBase * 0.5, wood: 0 }, sourceTower, false);
+            this.applyFrostbite(primaryTarget, 1);
         }
 
         if (this.globalMasteries.woodMastery) {
@@ -1546,7 +2150,8 @@ export class GameEngine {
 
         if (this.globalMasteries.fireMastery) {
             this.addEffect(primaryTarget.x + 0.5, primaryTarget.y + 0.5, 'fire_aura_proc', { life: 0.3, maxLife: 0.3, radius: 2 });
-            this.applyFireExplosion(primaryTarget, sourceTower, sourceBase * 0.2, 2);
+            const sampleHit = Math.max(1, hitDamage || sourceBase);
+            this.applyScorch(primaryTarget, sampleHit, 1);
         }
         if (sourceTower.localFireExplosion) {
             this.applyFireExplosion(primaryTarget, sourceTower, sourceBase * 0.5, 3);
@@ -1566,22 +2171,61 @@ export class GameEngine {
 
     applyEquipmentOnHit(primaryTarget, sourceTower) {
         if (!primaryTarget || !sourceTower?.equipmentId) return;
+        const equipmentLevel = this.getTowerEquipmentLevel(sourceTower);
 
         if (sourceTower.equipmentId === 'chain_lightning') {
-            this.triggerChainLightning(primaryTarget, sourceTower, 20 * (sourceTower.level || 1), 20, 0.1, 1.0);
+            const damage = Math.max(1, sourceTower.stats?.damage || 0);
+            const chainBonus = Math.max(0, this.getChainCount(sourceTower));
+            const maxChains = 10 + chainBonus;
+            const paralyzeChance = 0.1;
+            const paralyzeSec = 1.0;
+            this.triggerChainLightning(primaryTarget, sourceTower, damage, maxChains, paralyzeChance, paralyzeSec);
+        }
+
+        if (sourceTower.equipmentId === 'frost_emblem') {
+            const chance = Math.min(0.95, 0.35 + (0.1 * Math.max(0, equipmentLevel - 1)));
+            if (Math.random() < chance) {
+                const stacks = 1 + Math.floor(Math.max(0, equipmentLevel - 1) / 2);
+                this.applyFrostbite(primaryTarget, stacks);
+            }
+        }
+
+        if (sourceTower.equipmentId === 'burn_emblem') {
+            const damageScale = 0.2 * (1 + (0.4 * Math.max(0, equipmentLevel - 1)));
+            this.addBurnStack(primaryTarget, sourceTower, sourceTower.stats.damage * damageScale, 4);
+        }
+
+        if (sourceTower.equipmentId === 'venom_core') {
+            const damageScale = 0.15 * (1 + (0.35 * Math.max(0, equipmentLevel - 1)));
+            this.addPoisonStack(primaryTarget, sourceTower, sourceTower.stats.damage * damageScale, 5, sourceTower.poisonFrequencyLevel || 0);
+        }
+
+        if (sourceTower.equipmentId === 'shock_core' && Math.random() < Math.min(0.8, 0.18 + (0.06 * Math.max(0, equipmentLevel - 1)))) {
+            this.applyStun(primaryTarget, 0.2 + (0.05 * Math.max(0, equipmentLevel - 1)), 'stun');
+        }
+
+        if (sourceTower.equipmentId === 'echo_rune' && Math.random() < Math.min(0.8, 0.18 + (0.06 * Math.max(0, equipmentLevel - 1)))) {
+            const echoMult = 0.6 + (0.15 * Math.max(0, equipmentLevel - 1));
+            this.damageMob(primaryTarget, {
+                base: sourceTower.stats.damage * echoMult,
+                fire: (sourceTower.stats.extraFire || 0) * echoMult,
+                water: (sourceTower.stats.extraWater || 0) * echoMult,
+                wood: (sourceTower.stats.extraWood || 0) * echoMult
+            }, sourceTower, false);
         }
     }
 
     triggerChainLightning(originTarget, sourceTower, damage, maxChains, paralyzeChance, paralyzeSec) {
         let currentTarget = originTarget;
         const chainedIds = new Set();
+        const allowRepeatChain = !!sourceTower?.chainNoLimit;
         let prevX = sourceTower.x + 0.5;
         let prevY = sourceTower.y + 0.5;
 
         for (let i = 0; i <= maxChains; i++) {
             if (!currentTarget) break;
             const currentId = currentTarget.id;
-            if (currentId !== undefined) chainedIds.add(currentId);
+            if (!allowRepeatChain && currentId !== undefined) chainedIds.add(currentId);
 
             if (this.mobs.includes(currentTarget)) {
                 this.addEffect(currentTarget.x + 0.5, currentTarget.y + 0.5, 'lightning_strike', { life: 0.16, maxLife: 0.16 });
@@ -1602,7 +2246,10 @@ export class GameEngine {
                 }
             }
 
-            const nextTarget = this.findChainTarget(currentTarget, chainedIds);
+            const nextExcluded = allowRepeatChain
+                ? new Set(currentId !== undefined ? [currentId] : [])
+                : chainedIds;
+            const nextTarget = this.findChainTarget(currentTarget, nextExcluded);
             if (!nextTarget) break;
             prevX = currentTarget.x + 0.5;
             prevY = currentTarget.y + 0.5;
@@ -1665,7 +2312,135 @@ export class GameEngine {
             this.towerLimitBonus = (this.towerLimitBonus || 0) + 1;
             return { ok: true, message: '建設之書使用成功，本局建塔上限 +1' };
         }
+        if (itemId === 'repair_kit') {
+            if (this.hp >= this.maxHp) {
+                this.maxHp += 1;
+                this.hp = Math.min(this.maxHp, this.hp + 1);
+                return { ok: true, message: '急救套件使用成功：生命已滿，先擴充最大生命 +1，再恢復 1 點生命' };
+            }
+            this.hp = Math.min(this.maxHp, this.hp + 1);
+            return { ok: true, message: '急救套件使用成功，生命恢復 1' };
+        }
         return { ok: false, message: '此道具不是全域立即使用道具。' };
+    }
+
+    isBannerEquipment(itemId) {
+        return itemId === 'courage_banner'
+            || itemId === 'slaughter_banner'
+            || itemId === 'agility_banner';
+    }
+
+    getTowerEquipmentLevel(tower) {
+        if (!tower?.equipmentId) return 0;
+        return Math.max(1, Math.floor(tower.equipmentLevel || 1));
+    }
+
+    applyEquipmentImmediateBonuses(tower, itemId, previousLevel = 0) {
+        const currentLevel = this.getTowerEquipmentLevel(tower);
+        const levelDelta = Math.max(0, currentLevel - Math.max(0, previousLevel));
+
+        if (itemId === 'lubricant') {
+            const towerDef = Object.values(TOWER_TYPES).find((t) => t.id === tower.type) || TOWER_TYPES.MELEE;
+            const typeBaseSpeed = towerDef?.stats?.speed || 1;
+            const talentSpeedMult = this.getTowerTalentModifiersForType(tower.type).speedMult;
+            const previousCoreBase = previousLevel <= 0
+                ? typeBaseSpeed
+                : (1 * (1 + (0.08 * (previousLevel - 1))));
+            const currentCoreBase = 1 * (1 + (0.08 * (currentLevel - 1)));
+            const previousBaseWithTalent = Math.max(0.0001, previousCoreBase * talentSpeedMult);
+            const existingBonusMult = Math.max(0, (tower.stats.speed || 0) / previousBaseWithTalent);
+            tower.stats.speed = Math.max(0.0001, currentCoreBase * talentSpeedMult * existingBonusMult);
+            return { ok: true };
+        }
+
+        if (itemId === 'full_firepower') {
+            const towerDef = Object.values(TOWER_TYPES).find((t) => t.id === tower.type) || TOWER_TYPES.MELEE;
+            const typeBaseDamage = towerDef?.stats?.damage || 1;
+            const towerMods = this.getTowerTalentModifiersForType(tower.type);
+            const talentBaseBonus = towerMods.baseDamageBonus;
+            const talentAttrMult = towerMods.attrDamageMult;
+            const previousCoreBase = previousLevel <= 0
+                ? typeBaseDamage
+                : (40 + (12 * (previousLevel - 1)));
+            const currentCoreBase = 40 + (12 * (currentLevel - 1));
+            const previousBaseWithTalent = Math.max(0.0001, (previousCoreBase + talentBaseBonus) * talentAttrMult);
+            const existingBonusMult = Math.max(0, (tower.stats.damage || 0) / previousBaseWithTalent);
+            tower.stats.damage = Math.max(0, (currentCoreBase + talentBaseBonus) * talentAttrMult * existingBonusMult);
+            return { ok: true };
+        }
+
+        if (itemId === 'absorption_force') {
+            tower.absorptionKillCount = tower.absorptionKillCount || 0;
+            return { ok: true };
+        }
+        if (itemId === 'sniper_scope') {
+            tower.stats.range += (2 * levelDelta);
+            return { ok: true };
+        }
+        if (itemId === 'war_drum') {
+            tower.stats.speed *= Math.pow(1.2, levelDelta);
+            return { ok: true };
+        }
+        if (itemId === 'ricochet_module') {
+            if (tower.stats.type !== 'projectile') return { ok: false, message: '僅投射塔可裝備。' };
+            tower.bonusChain = (tower.bonusChain || 0) + (2 * levelDelta);
+            return { ok: true };
+        }
+        if (itemId === 'multishot_module') {
+            if (tower.stats.type !== 'projectile') return { ok: false, message: '僅投射塔可裝備。' };
+            tower.bonusTargets = (tower.bonusTargets || 0) + levelDelta;
+            return { ok: true };
+        }
+        if (itemId === 'rupture_blade') {
+            tower.bleedLevel = (tower.bleedLevel || 0) + levelDelta;
+            return { ok: true };
+        }
+        if (itemId === 'siege_shell') {
+            if (tower.type !== 'projectile_aoe') return { ok: false, message: '僅砲擊塔可裝備。' };
+            tower.knockbackRadiusBonus = (tower.knockbackRadiusBonus || 0) + levelDelta;
+            tower.knockbackBonus = (tower.knockbackBonus || 0) + (0.5 * levelDelta);
+            return { ok: true };
+        }
+        if (itemId === 'gravity_well') {
+            if (tower.type !== 'projectile_slow') return { ok: false, message: '僅緩速塔可裝備。' };
+            tower.slowAreaRadiusBonus = (tower.slowAreaRadiusBonus || 0) + levelDelta;
+            tower.slowDurationBonus = (tower.slowDurationBonus || 0) + levelDelta;
+            return { ok: true };
+        }
+        if (itemId === 'mana_reactor') {
+            if (tower.type !== 'magic') return { ok: false, message: '僅法術塔可裝備。' };
+            tower.triggerMagicLevel = (tower.triggerMagicLevel || 0) + levelDelta;
+            return { ok: true };
+        }
+        if (itemId === 'crystal_lens') {
+            tower.stats.critDmg = (tower.stats.critDmg || 2.0) + (0.5 * levelDelta);
+            return { ok: true };
+        }
+        if (itemId === 'time_weaver') {
+            tower.stats.speed *= Math.pow(1.15, levelDelta);
+            return { ok: true };
+        }
+
+        if (
+            itemId === 'chain_lightning'
+            || itemId === 'courage_banner'
+            || itemId === 'slaughter_banner'
+            || itemId === 'agility_banner'
+            || itemId === 'giant_slayer'
+            || itemId === 'executioner_axe'
+            || itemId === 'frost_emblem'
+            || itemId === 'burn_emblem'
+            || itemId === 'venom_core'
+            || itemId === 'shock_core'
+            || itemId === 'lucky_coin'
+            || itemId === 'vampire_fang'
+            || itemId === 'last_stand_emblem'
+            || itemId === 'echo_rune'
+        ) {
+            return { ok: true };
+        }
+
+        return { ok: false, message: '此裝備尚未實作效果。' };
     }
 
     applyInventoryItem(tower, itemId) {
@@ -1702,43 +2477,91 @@ export class GameEngine {
                 this.towerLimitBonus = (this.towerLimitBonus || 0) + 1;
                 return { ok: true, message: `${item.name} 使用成功，本局建塔上限 +1` };
             }
+            if (itemId === 'range_book') {
+                tower.stats.range += 1;
+                return { ok: true, message: `${item.name} 使用成功` };
+            }
+            if (itemId === 'fury_book') {
+                tower.stats.speed *= 1.2;
+                return { ok: true, message: `${item.name} 使用成功` };
+            }
+            if (itemId === 'precision_book') {
+                tower.stats.crit = Math.min(1, (tower.stats.crit || 0) + 0.15);
+                return { ok: true, message: `${item.name} 使用成功` };
+            }
+            if (itemId === 'fire_oil') {
+                tower.stats.extraFire = (tower.stats.extraFire || 0) + (tower.stats.damage * 0.25);
+                return { ok: true, message: `${item.name} 使用成功` };
+            }
+            if (itemId === 'water_oil') {
+                tower.stats.extraWater = (tower.stats.extraWater || 0) + (tower.stats.damage * 0.25);
+                return { ok: true, message: `${item.name} 使用成功` };
+            }
+            if (itemId === 'wood_oil') {
+                tower.stats.extraWood = (tower.stats.extraWood || 0) + (tower.stats.damage * 0.25);
+                return { ok: true, message: `${item.name} 使用成功` };
+            }
+            if (itemId === 'fortify_book') {
+                tower.stats.damage *= 1.2;
+                return { ok: true, message: `${item.name} 使用成功` };
+            }
+            if (itemId === 'split_manual') {
+                if (tower.stats.type !== 'projectile') return { ok: false, message: '僅投射塔可使用。' };
+                tower.bonusTargets = (tower.bonusTargets || 0) + 1;
+                return { ok: true, message: `${item.name} 使用成功` };
+            }
+            if (itemId === 'chain_manual') {
+                if (tower.stats.type !== 'projectile') return { ok: false, message: '僅投射塔可使用。' };
+                tower.bonusChain = (tower.bonusChain || 0) + 1;
+                return { ok: true, message: `${item.name} 使用成功` };
+            }
+            if (itemId === 'repair_kit') {
+                this.hp = Math.min(this.maxHp, this.hp + 1);
+                return { ok: true, message: `${item.name} 使用成功，生命恢復 1` };
+            }
+            if (itemId === 'specialization_reset_scroll') {
+                if (tower.level < 10 || !tower.specializationChosen) {
+                    return { ok: false, message: '僅可對已選過專精的滿等塔使用。' };
+                }
+                const ok = this.resetTowerSpecialization(tower);
+                if (!ok) return { ok: false, message: '該塔目前無法重置專精。' };
+                return { ok: true, message: `${item.name} 使用成功，請重新選擇專精。` };
+            }
             return { ok: false, message: '此消耗道具尚未實作效果。' };
         }
 
         if (item.type === ITEM_TYPES.EQUIPMENT) {
             if (tower.equipmentId) {
-                return { ok: false, message: '此塔已裝備道具，無法重複裝備。' };
-            }
-
-            if (itemId === 'lubricant') {
-                const towerDef = Object.values(TOWER_TYPES).find((t) => t.id === tower.type) || TOWER_TYPES.MELEE;
-                const typeBaseSpeed = towerDef?.stats?.speed || 1;
-                const talentSpeedMult = this.getTowerTalentModifiersForType(tower.type).speedMult;
-                const previousBaseWithTalent = Math.max(0.0001, typeBaseSpeed * talentSpeedMult);
-                const existingBonusMult = Math.max(0, (tower.stats.speed || 0) / previousBaseWithTalent);
-                tower.stats.speed = talentSpeedMult * existingBonusMult;
-            } else if (itemId === 'full_firepower') {
-                const towerDef = Object.values(TOWER_TYPES).find((t) => t.id === tower.type) || TOWER_TYPES.MELEE;
-                const typeBaseDamage = towerDef?.stats?.damage || 1;
-                const towerMods = this.getTowerTalentModifiersForType(tower.type);
-                const talentBaseBonus = towerMods.baseDamageBonus;
-                const talentAttrMult = towerMods.attrDamageMult;
-                const previousBaseWithTalent = Math.max(0.0001, (typeBaseDamage + talentBaseBonus) * talentAttrMult);
-                const existingBonusMult = Math.max(0, (tower.stats.damage || 0) / previousBaseWithTalent);
-                tower.stats.damage = Math.max(0, (40 + talentBaseBonus) * talentAttrMult * existingBonusMult);
-            } else if (itemId === 'absorption_force') {
-                tower.absorptionKillCount = tower.absorptionKillCount || 0;
-            } else if (
-                itemId !== 'chain_lightning'
-                && itemId !== 'courage_banner'
-                && itemId !== 'slaughter_banner'
-                && itemId !== 'agility_banner'
-            ) {
-                return { ok: false, message: '此裝備尚未實作效果。' };
+                if (tower.equipmentId !== itemId) {
+                    return { ok: false, message: '此塔已裝備其他道具，請先移除現有裝備。' };
+                }
+                if (this.isBannerEquipment(itemId)) {
+                    return { ok: false, message: '戰旗類裝備不可升級。' };
+                }
+                const currentLevel = this.getTowerEquipmentLevel(tower);
+                if (currentLevel >= 5) {
+                    return { ok: false, message: `${item.name} 已達最高等級（5）。` };
+                }
+                const previousLevel = currentLevel;
+                tower.equipmentLevel = currentLevel + 1;
+                const applyResult = this.applyEquipmentImmediateBonuses(tower, itemId, previousLevel);
+                if (!applyResult.ok) {
+                    tower.equipmentLevel = previousLevel;
+                    return applyResult;
+                }
+                return { ok: true, message: `${item.name} 升級成功（Lv.${tower.equipmentLevel}）` };
             }
 
             tower.equipmentId = itemId;
             tower.equipmentName = item.name;
+            tower.equipmentLevel = 1;
+            const applyResult = this.applyEquipmentImmediateBonuses(tower, itemId, 0);
+            if (!applyResult.ok) {
+                tower.equipmentId = null;
+                tower.equipmentName = null;
+                tower.equipmentLevel = 0;
+                return applyResult;
+            }
             return { ok: true, message: `${item.name} 裝備成功` };
         }
 
@@ -1773,9 +2596,9 @@ export class GameEngine {
             if ((dx * dx + dy * dy) > bannerRadiusSq) continue;
 
             if (sourceTower.equipmentId === 'courage_banner') {
-                result.critChance += 0.25;
+                result.critChance += 0.1;
             } else if (sourceTower.equipmentId === 'slaughter_banner') {
-                result.critDmgBonus += 0.4;
+                result.critDmgBonus += 0.1;
             } else if (sourceTower.equipmentId === 'agility_banner') {
                 result.speedPct += 0.1;
             }
@@ -1920,33 +2743,103 @@ export class GameEngine {
     }
 
     applySlowArea(primaryTarget, sourceTower) {
-        const radius = 2;
+        const radius = 2 + (sourceTower.slowAreaRadiusBonus || 0);
         const radiusSq = radius * radius;
         const terrainMods = this.getTowerTerrainModifiers(sourceTower);
+        const resonance = this.getTowerResonanceEffects(sourceTower);
         const baseSlowPct = 0.3 + ((sourceTower.slowPowerLevel || 0) * 0.1);
-        const slowPct = Math.min(0.95, baseSlowPct * (terrainMods.slowEffectMult || 1));
-        const slowMult = 1 - slowPct;
+        const slowPct = Math.min(0.95, baseSlowPct * (terrainMods.slowEffectMult || 1) * (resonance.slowEffectMult || 1));
+        const duration = 3 + (sourceTower.slowDurationBonus || 0);
 
         for (const mob of this.mobs) {
             const dx = mob.x - primaryTarget.x;
             const dy = mob.y - primaryTarget.y;
             if (dx * dx + dy * dy <= radiusSq) {
-                mob.slowStacks = mob.slowStacks || [];
-                mob.slowStacks.push({ mult: slowMult, duration: 3 });
+                const controlMult = this.getControlResistMultiplier(mob, 'slow');
+                const effectiveSlowPct = Math.min(0.95, slowPct * controlMult);
+                if (effectiveSlowPct <= 0.01) continue;
+                this.addSlowStack(mob, 1 - effectiveSlowPct, duration);
                 mob.slowEffectTimer = Math.max(mob.slowEffectTimer || 0, 0.4);
                 this.addEffect(mob.x + 0.5, mob.y + 0.5, 'slow_status', { life: 0.2, maxLife: 0.2 });
+                this.registerControlEffect(mob, 'slow');
             }
         }
+    }
+
+    addSlowStack(mob, mult, duration) {
+        if (!mob || duration <= 0) return;
+        const nextMult = Math.max(0.05, Math.min(1, mult || 1));
+        mob.slowStacks = mob.slowStacks || [];
+
+        const similar = mob.slowStacks.find((stack) => Math.abs((stack.mult || 1) - nextMult) <= 0.001);
+        if (similar) {
+            similar.duration = Math.max(similar.duration || 0, duration);
+            return;
+        }
+
+        const maxSlowStacks = 8;
+        if (mob.slowStacks.length >= maxSlowStacks) {
+            let weakestIndex = 0;
+            let weakestSlowPct = Math.max(0, Math.min(0.95, 1 - (mob.slowStacks[0].mult || 1)));
+            for (let i = 1; i < mob.slowStacks.length; i++) {
+                const slowPct = Math.max(0, Math.min(0.95, 1 - (mob.slowStacks[i].mult || 1)));
+                if (slowPct < weakestSlowPct) {
+                    weakestSlowPct = slowPct;
+                    weakestIndex = i;
+                }
+            }
+            const incomingSlowPct = Math.max(0, Math.min(0.95, 1 - nextMult));
+            if (incomingSlowPct <= weakestSlowPct) {
+                mob.slowStacks[weakestIndex].duration = Math.max(mob.slowStacks[weakestIndex].duration || 0, duration);
+                return;
+            }
+            mob.slowStacks[weakestIndex] = { mult: nextMult, duration };
+            return;
+        }
+
+        mob.slowStacks.push({ mult: nextMult, duration });
+    }
+
+    addBurnStack(target, sourceTower, perTickDamage, durationSec) {
+        if (!target || !sourceTower || perTickDamage <= 0 || durationSec <= 0) return;
+        target.burnStacks = target.burnStacks || [];
+        target.burnStacks.push({
+            sourceTowerId: sourceTower.id,
+            damagePerTick: perTickDamage,
+            duration: durationSec,
+            tickTimer: 1,
+            tickInterval: 1
+        });
+    }
+
+    applyFrostbite(target, addStacks = 1) {
+        if (!target || addStacks <= 0) return;
+        target.frostbiteStacks = Math.min(100, Math.max(0, (target.frostbiteStacks || 0) + addStacks));
+        target.frostbiteTimer = 3;
+    }
+
+    applyScorch(target, hitDamage, addStacks = 1) {
+        if (!target || addStacks <= 0) return;
+        const sample = Math.max(1, hitDamage || 1);
+        const prevStacks = Math.max(0, target.scorchStacks || 0);
+        const prevSamples = Math.max(0, target.scorchSamples || 0);
+        const nextStacks = Math.min(100, prevStacks + addStacks);
+        target.scorchStacks = nextStacks;
+        target.scorchSamples = prevSamples + 1;
+        target.scorchAvgHit = ((target.scorchAvgHit || 0) * prevSamples + sample) / Math.max(1, target.scorchSamples);
+        target.scorchTimer = 3;
+        target.scorchTickTimer = Math.min(1, target.scorchTickTimer || 1);
     }
 
     applyBleed(target, sourceTower) {
         const level = sourceTower.bleedLevel || 0;
         if (level <= 0) return;
 
+        const resonance = this.getTowerResonanceEffects(sourceTower);
         const bleedMult = sourceTower.bleedDamageMult || 1;
-        const duration = sourceTower.bleedDurationOverride || 4;
+        const duration = (sourceTower.bleedDurationOverride || 4) + (resonance.bleedDurationBonus || 0);
         const bleedReduction = Math.max(0, target.affixMap?.bleed_dmg_reduction || 0);
-        const perTick = sourceTower.stats.damage * (0.3 * level) * bleedMult * (1 - bleedReduction);
+        const perTick = sourceTower.stats.damage * (0.3 * level) * bleedMult * (resonance.bleedDamageMult || 1) * (1 - bleedReduction);
         target.bleedMap = {};
         target.bleedMap[sourceTower.id] = {
             damagePerTick: perTick,
@@ -1965,12 +2858,13 @@ export class GameEngine {
         const globalTickRateMult = this.globalMasteries.poisonTickRateMult || 1;
         const sourceTickRateMult = 1 + (0.25 * Math.max(0, sourcePoisonFreqLevel));
         const tickInterval = 1 / Math.max(0.1, sourceTickRateMult * globalTickRateMult);
+        const ailmentTerrainMods = this.getMobAilmentTerrainModifiers(target);
 
         const poisonReduction = Math.max(0, target.affixMap?.poison_dmg_reduction || 0);
         target.poisonStacks = target.poisonStacks || [];
         target.poisonStacks.push({
             sourceTowerId: sourceTower.id,
-            damagePerTick: perTickDamage * globalDamageMult * (1 - poisonReduction),
+            damagePerTick: perTickDamage * globalDamageMult * (ailmentTerrainMods.poisonDamageMult || 1) * (1 - poisonReduction),
             duration: Math.max(durationSec, globalDurationMin),
             tickTimer: tickInterval,
             tickInterval
@@ -1982,40 +2876,138 @@ export class GameEngine {
     applyFireExplosion(centerTarget, sourceTower, damage, radius) {
         this.addEffect(centerTarget.x + 0.5, centerTarget.y + 0.5, 'fire_spell', { life: 0.35, maxLife: 0.35, radius });
         const radiusSq = radius * radius;
+        const hasFireMagic = this.getTowerMagicElements(sourceTower).includes('fire');
         for (const mob of this.mobs) {
             const dx = mob.x - centerTarget.x;
             const dy = mob.y - centerTarget.y;
             if (dx * dx + dy * dy <= radiusSq) {
                 this.damageMob(mob, { base: 0, fire: damage, water: 0, wood: 0 }, sourceTower, false);
-                if (sourceTower?.magicElement === 'fire') {
+                if (hasFireMagic) {
                     mob.fireVulnerabilityStacks = Math.min(5, (mob.fireVulnerabilityStacks || 0) + 1);
                 }
             }
         }
     }
 
+    applyWoodFireFusion(centerTarget, sourceTower, powerScale = 1) {
+        const radius = 3.5;
+        const radiusSq = radius * radius;
+        const base = (sourceTower.stats.damage || 0) * powerScale;
+        this.addEffect(centerTarget.x + 0.5, centerTarget.y + 0.5, 'fire_spell', { life: 0.45, maxLife: 0.45, radius });
+        for (const mob of this.mobs) {
+            const dx = mob.x - centerTarget.x;
+            const dy = mob.y - centerTarget.y;
+            if (dx * dx + dy * dy > radiusSq) continue;
+            this.damageMob(mob, { base: 0, fire: base * 1.3, water: 0, wood: base * 0.9 }, sourceTower, false);
+            this.addPoisonStack(mob, sourceTower, Math.max(1, base * 0.2), 5, sourceTower.poisonFrequencyLevel || 0);
+            this.applyScorch(mob, base * 0.8, 1);
+        }
+    }
+
+    applyFireWaterFusion(centerTarget, sourceTower, powerScale = 1) {
+        const radius = 4;
+        const radiusSq = radius * radius;
+        const base = (sourceTower.stats.damage || 0) * powerScale;
+        this.addEffect(centerTarget.x + 0.5, centerTarget.y + 0.5, 'water_spell', { life: 0.4, maxLife: 0.4, radius });
+        for (const mob of this.mobs) {
+            const dx = mob.x - centerTarget.x;
+            const dy = mob.y - centerTarget.y;
+            if (dx * dx + dy * dy > radiusSq) continue;
+            this.damageMob(mob, { base: 0, fire: base * 1.1, water: base * 1.1, wood: 0 }, sourceTower, false);
+            this.applyFrostbite(mob, 2);
+            this.applyScorch(mob, base * 0.9, 1);
+        }
+    }
+
+    applyWaterWoodFusion(centerTarget, sourceTower, powerScale = 1) {
+        const radius = 3.5;
+        const radiusSq = radius * radius;
+        const base = (sourceTower.stats.damage || 0) * powerScale;
+        this.addEffect(centerTarget.x + 0.5, centerTarget.y + 0.5, 'water_spell', { life: 0.45, maxLife: 0.45, radius });
+        for (const mob of this.mobs) {
+            const dx = mob.x - centerTarget.x;
+            const dy = mob.y - centerTarget.y;
+            if (dx * dx + dy * dy > radiusSq) continue;
+            this.damageMob(mob, { base: 0, fire: 0, water: base * 1.1, wood: base * 1.1 }, sourceTower, false);
+            this.applyFrostbite(mob, 1);
+            this.addPoisonStack(mob, sourceTower, Math.max(1, base * 0.22), 5, sourceTower.poisonFrequencyLevel || 0);
+            mob.magicWaterSlowStacks = Math.min(7, (mob.magicWaterSlowStacks || 0) + 2);
+        }
+    }
+
+    spawnFusionControlZone(x, y, sourceTower, mode = 'neutral') {
+        this.areaEffects.push({
+            type: 'fusion_control',
+            mode,
+            x,
+            y,
+            sourceTowerId: sourceTower?.id || null,
+            radius: 3.5,
+            pullRadius: 4.5,
+            life: 3,
+            controlTickTimer: 0.2
+        });
+    }
+
     applyMagicElementEffects(primaryTarget, sourceTower) {
-        if (!primaryTarget || !sourceTower?.magicElement) return;
-        const triggerChance = Math.min(1, 0.4 + ((sourceTower.triggerMagicLevel || 0) * 0.2));
+        const magicElements = this.getTowerMagicElements(sourceTower);
+        if (!primaryTarget || magicElements.length <= 0) return;
+
+        const triggerBonus = Math.max(0, sourceTower.magicTriggerChanceBonus || 0);
+        const triggerChance = Math.min(1, 0.4 + ((sourceTower.triggerMagicLevel || 0) * 0.2) + triggerBonus);
         if (Math.random() >= triggerChance) return;
 
         const level = Math.max(1, sourceTower.magicElementLevel || 1);
         const sourceBase = sourceTower.stats.damage || 0;
-        if (sourceTower.magicElement === 'fire') {
+        const ailmentPower = Math.max(1, sourceTower.magicAilmentPowerMult || 1);
+
+        if (sourceTower.specializationId === 'spec_magic_combo_wood_fire' && magicElements.includes('wood') && magicElements.includes('fire')) {
+            this.applyWoodFireFusion(primaryTarget, sourceTower, 1.6 * ailmentPower);
+            this.spawnFusionControlZone(primaryTarget.x, primaryTarget.y, sourceTower, 'wood_fire');
+            return;
+        }
+        if (sourceTower.specializationId === 'spec_magic_combo_fire_water' && magicElements.includes('fire') && magicElements.includes('water')) {
+            this.applyFireWaterFusion(primaryTarget, sourceTower, 1.6 * ailmentPower);
+            this.spawnFusionControlZone(primaryTarget.x, primaryTarget.y, sourceTower, 'fire_water');
+            return;
+        }
+        if (sourceTower.specializationId === 'spec_magic_combo_water_wood' && magicElements.includes('water') && magicElements.includes('wood')) {
+            this.applyWaterWoodFusion(primaryTarget, sourceTower, 1.6 * ailmentPower);
+            this.spawnFusionControlZone(primaryTarget.x, primaryTarget.y, sourceTower, 'water_wood');
+            return;
+        }
+
+        const picked = magicElements[Math.floor(Math.random() * magicElements.length)];
+        if (picked === 'fire') {
             const damage = sourceBase + 40 + ((level - 1) * 60);
             this.applyFireExplosion(primaryTarget, sourceTower, damage, 3);
+            if ((sourceTower.magicFireScorchTalent || 0) > 0) {
+                this.applyScorch(primaryTarget, damage * ailmentPower, Math.max(1, sourceTower.magicFireScorchTalent || 0));
+            }
             return;
         }
 
-        if (sourceTower.magicElement === 'water') {
+        if (picked === 'water') {
             const damage = sourceBase + 40 + ((level - 1) * 60);
             this.applyWaterSplash(primaryTarget, sourceTower, damage, 3);
+            if ((sourceTower.magicWaterFrostbiteTalent || 0) > 0) {
+                this.applyFrostbite(primaryTarget, Math.max(1, sourceTower.magicWaterFrostbiteTalent || 0));
+            }
             return;
         }
 
-        if (sourceTower.magicElement === 'wood') {
+        if (picked === 'wood') {
             const damagePerSecond = sourceBase + 20 + ((level - 1) * 40);
             this.spawnTornado(primaryTarget.x, primaryTarget.y, sourceTower, damagePerSecond, 3, 3);
+            if ((sourceTower.magicWoodPoisonTalent || 0) > 0) {
+                this.addPoisonStack(
+                    primaryTarget,
+                    sourceTower,
+                    Math.max(1, sourceBase * 0.2 * ailmentPower),
+                    4 + (sourceTower.magicWoodPoisonTalent || 0),
+                    sourceTower.poisonFrequencyLevel || 0
+                );
+            }
         }
     }
 
@@ -2061,6 +3053,9 @@ export class GameEngine {
                 eff.damageTickTimer -= dt;
                 eff.pullTickTimer -= dt;
             }
+            if (eff.type === 'fusion_control') {
+                eff.controlTickTimer -= dt;
+            }
 
             if (eff.type === 'tornado') {
                 const src = this.towers.find((t) => t.id === eff.sourceTowerId) || null;
@@ -2078,6 +3073,9 @@ export class GameEngine {
                             const pull = Math.min(0.01, dist);
                             mob.x += (dx / dist) * pull;
                             mob.y += (dy / dist) * pull;
+                            this.addSlowStack(mob, 0.85, 0.3);
+                            mob.slowEffectTimer = Math.max(mob.slowEffectTimer || 0, 0.2);
+                            this.registerControlEffect(mob, 'slow');
                         }
                     }
                 }
@@ -2095,6 +3093,41 @@ export class GameEngine {
                 }
             }
 
+            if (eff.type === 'fusion_control') {
+                const sourceTower = eff.sourceTowerId ? (this.towers.find((t) => t.id === eff.sourceTowerId) || null) : null;
+                const radiusSq = (eff.radius || 3.5) * (eff.radius || 3.5);
+                const pullRadiusSq = (eff.pullRadius || 4.5) * (eff.pullRadius || 4.5);
+
+                while (eff.controlTickTimer <= 0) {
+                    eff.controlTickTimer += 0.2;
+                    for (const mob of this.mobs) {
+                        const dx = eff.x - mob.x;
+                        const dy = eff.y - mob.y;
+                        const distSq = dx * dx + dy * dy;
+
+                        if (distSq <= radiusSq) {
+                            let slowMult = 0.8;
+                            if (eff.mode === 'fire_water') slowMult = 0.7;
+                            if (eff.mode === 'water_wood') slowMult = 0.75;
+                            this.addSlowStack(mob, slowMult, 0.35);
+                            mob.slowEffectTimer = Math.max(mob.slowEffectTimer || 0, 0.2);
+                            this.registerControlEffect(mob, 'slow');
+                        }
+
+                        if ((eff.mode === 'wood_fire' || eff.mode === 'water_wood') && distSq <= pullRadiusSq) {
+                            const dist = Math.sqrt(distSq) || 1;
+                            const pull = Math.min(0.014, dist);
+                            mob.x += (dx / dist) * pull;
+                            mob.y += (dy / dist) * pull;
+                        }
+
+                        if (eff.mode === 'fire_water' && distSq <= radiusSq && sourceTower && Math.random() < 0.12) {
+                            this.applyStun(mob, 0.12, 'stun');
+                        }
+                    }
+                }
+            }
+
             if (eff.life <= 0) {
                 this.areaEffects.splice(i, 1);
             }
@@ -2107,6 +3140,37 @@ export class GameEngine {
         mob.slowEffectTimer = Math.max(0, (mob.slowEffectTimer || 0) - dt);
         mob.knockbackFxTimer = Math.max(0, (mob.knockbackFxTimer || 0) - dt);
         mob.poisonEffectTimer = Math.max(0, (mob.poisonEffectTimer || 0) - dt);
+
+        mob.frostbiteTimer = Math.max(0, (mob.frostbiteTimer || 0) - dt);
+        if ((mob.frostbiteTimer || 0) <= 0) {
+            mob.frostbiteStacks = 0;
+        }
+
+        mob.scorchTimer = Math.max(0, (mob.scorchTimer || 0) - dt);
+        if ((mob.scorchTimer || 0) <= 0) {
+            mob.scorchStacks = 0;
+            mob.scorchAvgHit = 0;
+            mob.scorchSamples = 0;
+            mob.scorchTickTimer = 1;
+        } else {
+            mob.scorchTickTimer = (mob.scorchTickTimer || 1) - dt;
+            const ailmentTerrainMods = this.getMobAilmentTerrainModifiers(mob);
+            const scorchReduction = Math.max(0, Math.min(0.95, mob.affixMap?.scorch_dmg_reduction || 0));
+            while ((mob.scorchTickTimer || 0) <= 0 && this.mobs.includes(mob)) {
+                mob.scorchTickTimer += 1;
+                const scorchDps = Math.max(
+                    0,
+                    (mob.scorchStacks || 0)
+                    * (mob.scorchAvgHit || 0)
+                    * (ailmentTerrainMods.scorchDamageMult || 1)
+                    * (1 - scorchReduction)
+                );
+                if (scorchDps > 0) {
+                    this.damageMob(mob, { base: 0, fire: scorchDps, water: 0, wood: 0 }, null, false);
+                    if (!this.mobs.includes(mob)) return;
+                }
+            }
+        }
 
         if (mob.bleedMap) {
             for (const key of Object.keys(mob.bleedMap)) {
@@ -2146,6 +3210,25 @@ export class GameEngine {
             }
         }
 
+        if (mob.burnStacks && mob.burnStacks.length > 0) {
+            for (let i = mob.burnStacks.length - 1; i >= 0; i--) {
+                const stack = mob.burnStacks[i];
+                stack.duration -= dt;
+                stack.tickTimer -= dt;
+
+                while (stack.tickTimer <= 0 && stack.duration > 0 && this.mobs.includes(mob)) {
+                    stack.tickTimer += (stack.tickInterval || 1);
+                    const sourceTower = this.towers.find(t => t.id === stack.sourceTowerId);
+                    this.damageMob(mob, { base: 0, fire: stack.damagePerTick, water: 0, wood: 0 }, sourceTower, false);
+                    if (!this.mobs.includes(mob)) return;
+                }
+
+                if (stack.duration <= 0) {
+                    mob.burnStacks.splice(i, 1);
+                }
+            }
+        }
+
         const hasPoison = !!(mob.poisonStacks && mob.poisonStacks.length > 0);
         mob.poisonSlowMultiplier = hasPoison
             ? Math.max(0.05, 1 - (this.globalMasteries.poisonSlowPct || 0))
@@ -2159,20 +3242,39 @@ export class GameEngine {
                 }
             }
 
-            let mult = 1;
-            for (const stack of mob.slowStacks) {
-                mult *= stack.mult;
+            const slowPcts = mob.slowStacks
+                .map((stack) => Math.max(0, Math.min(0.95, 1 - (stack.mult || 1))))
+                .sort((a, b) => b - a);
+            let totalSlowPct = slowPcts[0] || 0;
+            for (let i = 1; i < slowPcts.length; i++) {
+                totalSlowPct += slowPcts[i] * 0.3;
             }
+            totalSlowPct = Math.min(0.95, totalSlowPct);
+            const mult = 1 - totalSlowPct;
             const slowCap = Math.max(0.05, mob.affixMap?.slow_resist_cap || 0.05);
             mob.slowMultiplier = Math.max(slowCap, mult);
             mob.slowTimer = 0;
+        } else {
+            mob.slowMultiplier = 1;
+        }
+
+        if (mob.controlResistTimers) {
+            for (const key of Object.keys(mob.controlResistTimers)) {
+                mob.controlResistTimers[key] -= dt;
+                if (mob.controlResistTimers[key] <= 0) {
+                    mob.controlResistTimers[key] = 0;
+                    if (mob.controlResistStacks) mob.controlResistStacks[key] = 0;
+                }
+            }
         }
     }
 
     knockbackMob(mob, distance) {
         const knockbackResist = Math.max(0, Math.min(0.95, mob?.affixMap?.knockback_resist || 0));
-        const effectiveDistance = Math.max(0, distance * (1 - knockbackResist));
+        const controlMult = this.getControlResistMultiplier(mob, 'knockback');
+        const effectiveDistance = Math.max(0, distance * controlMult * (1 - knockbackResist));
         if (effectiveDistance <= 0) return;
+        this.registerControlEffect(mob, 'knockback');
 
         const current = (mob.pathIndex || 0) + (mob.progress || 0);
         const next = Math.max(0, current - effectiveDistance);

@@ -27,50 +27,44 @@
 ## 3. 道具/裝備掉落表（每次擊殺各條目獨立判定）
 
 ### 3.1 normal
-- `潤滑油`（`lubricant`）：`0.4%`
-- `火力全開`（`full_firepower`）：`0.4%`
-- `閃電鏈`（`chain_lightning`）：`0.2%`
-- `勇氣旗幟`（`courage_banner`）：`0.2%`
-- `殺戮旗幟`（`slaughter_banner`）：`0.2%`
-- `靈活旗幟`（`agility_banner`）：`0.2%`
+- `爆擊機率之書`（`crit_book`）：`5%`
+- `速度之書`（`speed_book`）：`2%`
+- `建設之書`（`build_book`）：`2%`
 
 ### 3.2 fire
+- `爆擊傷害之書`（`crit_book`）：`5%`
 - `力量之書`（`power_book`）：`2%`
-- `潤滑油`（`lubricant`）：`0.4%`
-- `火力全開`（`full_firepower`）：`0.4%`
-- `閃電鏈`（`chain_lightning`）：`0.2%`
-- `勇氣旗幟`（`courage_banner`）：`0.2%`
-- `殺戮旗幟`（`slaughter_banner`）：`0.2%`
-- `靈活旗幟`（`agility_banner`）：`0.2%`
+- `建設之書`（`build_book`）：`2%`
 
 ### 3.3 water
-- `等級之書`（`level_book`）：`1%`
-- `潤滑油`（`lubricant`）：`0.4%`
-- `火力全開`（`full_firepower`）：`0.4%`
-- `閃電鏈`（`chain_lightning`）：`0.2%`
-- `勇氣旗幟`（`courage_banner`）：`0.2%`
-- `殺戮旗幟`（`slaughter_banner`）：`0.2%`
-- `靈活旗幟`（`agility_banner`）：`0.2%`
+- `速度之書`（`speed_book`）：`5%`
+- `爆擊傷害之書`（`crit_book`）：`2%`
+- `建設之書`（`build_book`）：`2%`
 
 ### 3.4 wood
-- `速度之書`（`speed_book`）：`1%`
-- `潤滑油`（`lubricant`）：`0.4%`
-- `火力全開`（`full_firepower`）：`0.4%`
-- `閃電鏈`（`chain_lightning`）：`0.2%`
-- `勇氣旗幟`（`courage_banner`）：`0.2%`
-- `殺戮旗幟`（`slaughter_banner`）：`0.2%`
-- `靈活旗幟`（`agility_banner`）：`0.2%`
+- `力量之書`（`power_book`）：`5%`
+- `爆擊機率之書`（`crit_book`）：`2%`
+- `建設之書`（`build_book`）：`2%`
 
 ## 3.5 輔助塔相關額外產出
-- 以下由「輔助塔升級/專精」直接產生，不走怪物掉落表：
+- 以下由「輔助塔升級/專精」直接產生：
   - `level_book`
-  - `speed_book`
-  - `power_book`
-  - `crit_book`
+  - `build_book`
+  - `reset_book`
+  - `random_equipment`
 
-## 3.6 Boss 額外掉落
-- `build_book`（建設之書）：`10%`
+## 3.6 Boss 掉落 每種道具獨立計算掉落機率(可能發生一個BOSS多個掉落物)
+- `build_book`（建設之書）：`20%`
+- `level_book`（等級之書）：`10%`
+- `reset_book`（專精重置之書）：`2%`
+- `加速器`（`lubricant`）：`2%`
+- `火力全開`（`full_firepower`）：`2%`
+- `閃電鏈`（`chain_lightning`）：`2%`
+- `勇氣旗幟`（`courage_banner`）：`3%`
+- `殺戮旗幟`（`slaughter_banner`）：`3%`
+- `靈活旗幟`（`agility_banner`）：`3%`
 
+已裝備旗幟的塔上再裝備旗幟會升級旗幟效果 (可無限升級)
 ## 4. 維護建議
 - 若要調整掉落機率，請同步修改：
   - `src/data/items.js`
@@ -99,20 +93,43 @@
 ## 6. 怪物詞墜權重（調整用）
 | 詞墜ID | 詞墜名稱 | 建議權重 | 備註 |
 |---|---:|---:|---|
-| `slow_resist_cap` | 緩速效果減免 | 5 | 10波後生效，50波內遞進至40%下限 |
-| `stun_hardness` | 暈眩效果硬質 | 5 | 每秒最多承受0.5秒暈眩 |
-| `stun_duration_reduction` | 暈眩效果減免 | 5 | 10波後生效，50波內遞進至80% |
-| `palsy_resist_cap` | 麻痺效果硬質 | 5 | 每秒最多承受0.1秒麻痺 |
-| `crit_damage_reduction` | 暴擊傷害減免 | 5 | 50波內等效至200%減免上限 |
-| `melee_dmg_reduction` | 近戰傷害減免 | 10 | 固定30% |
-| `bleed_dmg_reduction` | 流血減免 | 10 | 固定30% |
-| `poison_dmg_reduction` | 中毒傷害減免 | 10 | 固定50% |
-| `projectile_dmg_reduction` | 投射物傷害減免 | 10 | 固定30% |
-| `elemental_dmg_reduction` | 元素傷害減免 | 10 | 固定30% |
-| `move_speed_up` | 怪物移動速度提升10~60% | 30 | 10波後生效，60波內遞進至60% |
-| `hp_percent_up` | 增加怪物生命10~60%數 | 40 | 新增：10波後生效，60波內遞進至60% |
-| `knockback_resist` | 擊退效果減少10~95% | 40 | 新增：1波後生效，50波內遞進至95% |
+| `slow_resist_cap` | 緩速效果減免 | 30 | 10波後生效，50波內遞進至40%下限 |
+| `stun_hardness` | 暈眩效果硬直 | 20 | 每秒最多承受0.5秒暈眩 |
+| `stun_duration_reduction` | 暈眩效果減免 | 20| 10波後生效，50波內遞進至80% |
+| `palsy_resist_cap` | 麻痺效果硬直 | 20 | 每秒最多承受0.1秒麻痺 |
+| `crit_damage_reduction` | 暴擊傷害減免 | 10 | 50波內等效至200%減免上限 |
+| `melee_dmg_reduction` | 近戰傷害減免 | 10 | 固定30%隨波數提升最高90% |
+| `bleed_dmg_reduction` | 流血減免 | 10 | 固定30%隨波數提升最高90% |
+| `poison_dmg_reduction` | 中毒傷害減免 | 10 | 固定50%隨波數提升最高90% |
+| `projectile_dmg_reduction` | 投射物傷害減免 | 15 | 固定30%隨波數提升最高90% |
+| `elemental_dmg_reduction` | 元素傷害減免 | 15 | 固定30%隨波數提升最高90% |
+| `move_speed_up` | 怪物移動速度提升 | 30 | 10波後生效，100波內遞進至100% |
+| `hp_percent_up` | 增加怪物生命 | 40 | 10波後生效，100波內遞進至100% |
+| `knockback_resist` | 擊退效果減少 | 40 | 10波後生效，100波內遞進至95% |
 
-### 6.1 新增詞墜
-- `hp_percent_up`：增加怪物生命10%~60%（依波數遞進，60 波內遞進至 60%）。
-- `knockback_resist`：擊退效果減免（依波數遞進，60 波內遞進至 60%）。
+## 2026-02-23 更新（怪物/詞墜）
+
+### 詞墜出現規則
+- 11~19 波：固定 1 詞墜
+- 20~29 波：固定 2 詞墜（不重複）
+- 30~39 波：固定 3 詞墜（同控制系不重複）
+- 40 波後：每 10 波 +1 詞墜
+- 30 波後僅 move_speed_up、hp_percent_up 允許同波重複
+
+### 新增狀態異常
+- 凍傷：最高 100 層，持續 3 秒，刷新可疊層；每層增加怪物承傷 5%
+- 灼傷：持續 3 秒，刷新時間；每秒傷害 = 層數 x 灼傷附加時命中傷害平均值
+
+### 地形對異常加成
+- swamp：凍傷加成、灼傷削弱
+- desert：灼傷加成、凍傷削弱
+- forest：中毒加成
+## 2026-02-23 更新（已實作：怪物數量與新詞墜）
+- 出怪數量公式（不點天賦）：count = min(80, 0.025*w^2 + 0.75*w + 10)
+- 對應點位：10波=20、20波=35、30波=55、40波=80（40波後封頂80）
+- 最終出怪數：floor(基礎數量 * 怪物數量天賦倍率 * 詞墜怪物數量倍率)
+- 新增詞墜 mob_count_up：30波後可出現，怪物數量 x1.25~x3，權重10
+- 新增詞墜 oss_count_up：30波後可出現，額外BOSS +1~+5，權重10
+- 新增詞墜 rostbite_dmg_reduction：10波後生效，100波內遞進至95%
+- 新增詞墜 scorch_dmg_reduction：10波後生效，100波內遞進至95%
+- BOSS數量改為可被詞墜影響：1 + boss_count_up（不超過當波總出怪數）
