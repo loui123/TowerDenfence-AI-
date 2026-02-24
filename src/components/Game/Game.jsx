@@ -14,7 +14,7 @@ const hasAnyTwoAilmentTalents = (tower) => {
         tower?.upgradeStats?.magic_wood_poison_talent || 0,
         tower?.upgradeStats?.magic_water_frostbite_talent || 0,
         tower?.upgradeStats?.magic_fire_scorch_talent || 0
-    ].filter((v) => v > 0).length;
+    ].filter((v) => v > 1).length;
     return count >= 2;
 };
 
@@ -29,12 +29,12 @@ const UPGRADE_POOL = [
     { id: 'base_magic_dmg', label: '法術基礎傷害 +20', desc: '法術塔基礎傷害提高 20', onlyMagic: true },
     { id: 'speed_magic', label: '急速施法', desc: '攻擊間隔縮短 20%（最多 5 次）', onlyMagic: true, maxCount: 5 },
     { id: 'trigger_magic', label: '法術觸發率 +20%', desc: '元素法術觸發機率提高 20%（最多 3 次）', onlyMagic: true, onlyAfterMagicElement: true, maxCount: 3 },
-    { id: 'elemental_fire_magic', label: '火元素術式', desc: '攻擊時機率觸發炎爆，升級後提升傷害量', onlyMagic: true, magicElement: 'fire' },
-    { id: 'elemental_water_magic', label: '水元素術式', desc: '攻擊時機率觸發水球，升級後提升傷害量', onlyMagic: true, magicElement: 'water' },
-    { id: 'elemental_wood_magic', label: '木元素術式', desc: '攻擊時機率觸發龍捲風（龍捲風在場上持續3秒，每秒對範圍內怪物造成傷害），升級後提升傷害量', onlyMagic: true, magicElement: 'wood' },
-    { id: 'magic_wood_poison_talent', label: '木法毒蝕', desc: '提升木屬性法術傷害量', onlyMagic: true, requiredMagicElement: 'wood', maxCount: 3 },
-    { id: 'magic_water_frostbite_talent', label: '水法凍傷', desc: '提升水屬性法術異常效果與傷害量', onlyMagic: true, requiredMagicElement: 'water', maxCount: 3 },
-    { id: 'magic_fire_scorch_talent', label: '火法灼燒', desc: '提升火屬性法術異常效果與傷害量', onlyMagic: true, requiredMagicElement: 'fire', maxCount: 3 },
+    { id: 'elemental_fire_magic', label: '法術-炎爆', desc: '攻擊時機率觸發炎爆，升級後提升傷害量', onlyMagic: true, magicElement: 'fire' },
+    { id: 'elemental_water_magic', label: '法術-水球', desc: '攻擊時機率觸發水球，升級後提升傷害量', onlyMagic: true, magicElement: 'water' },
+    { id: 'elemental_wood_magic', label: '法術-龍捲風', desc: '攻擊時機率觸發龍捲風（龍捲風在場上持續3秒，每秒對範圍內怪物造成傷害），升級後提升傷害量', onlyMagic: true, magicElement: 'wood' },
+    { id: 'magic_wood_poison_talent', label: '木法毒蝕', desc: '龍捲風每次造成傷害對怪物附加中毒效果', onlyMagic: true, requiredMagicElement: 'wood', maxCount: 3 },
+    { id: 'magic_water_frostbite_talent', label: '水法凍傷', desc: '水球擊中怪物附加5層凍傷效果', onlyMagic: true, requiredMagicElement: 'water', maxCount: 3 },
+    { id: 'magic_fire_scorch_talent', label: '火法灼燒', desc: '炎爆擊中怪物附加1層灼燒效果', onlyMagic: true, requiredMagicElement: 'fire', maxCount: 3 },
     { id: 'fire_dmg', label: '火屬性附加傷害 +25%', desc: '增加火屬性追加傷害，並附加灼傷（3秒）', element: 'fire' },
     { id: 'water_dmg', label: '水屬性附加傷害 +25%', desc: '增加水屬性追加傷害，並附加凍傷（3秒）', element: 'water' },
     { id: 'wood_dmg', label: '木屬性附加傷害 +25%', desc: '增加木屬性追加傷害，並附加中毒效果', element: 'wood' },
@@ -50,17 +50,17 @@ const UPGRADE_POOL = [
     { id: 'proj_count_up', label: '攻擊數量 +1', desc: '投射物額外命中目標 +1', onlyProjectile: true, maxCount: 2 },
     { id: 'melee_bleed', label: '附加流血', desc: '近戰命中後 4 秒流血，每秒 30% 傷害（每級 +30%，不可疊加）', onlyMelee: true },
     { id: 'addition_attack', label: '額外攻擊 +1', desc: '命中時追加 50% 基礎傷害攻擊', onlyMelee: true, maxCount: 3 },
-    { id: 'slow_power_up', label: '緩速效果增加 +10%', desc: '緩速塔每級額外 +10% 緩速', onlySlowTower: true, maxCount: 3 },
-    { id: 'knockback_up', label: '攻擊爆炸擊退距離 +0.5', desc: '砲擊塔爆炸命中擊退更遠', onlyArtillery: true },
+    { id: 'slow_power_up', label: '緩速效果增加 +10%', desc: '緩速塔每級額外 +10% 緩速，緩速效果達到上限改為增加怪物承受傷害', onlySlowTower: true, maxCount: 3 },
+    { id: 'knockback_up', label: '攻擊爆炸擊退距離 +0.25', desc: '砲擊塔爆炸命中時：擊退距離 +0.25，且每次擊退使該塔對該怪承傷 +10%（上限 +50%）', onlyArtillery: true },
     { id: 'knockback_stun', label: '爆炸暈眩 +0.2秒', desc: '砲擊塔爆炸附加 0.2 秒暈眩', onlyArtillery: true },
     { id: 'knockback_radius', label: '爆炸範圍 +1', desc: '砲擊塔爆炸範圍增加 1 格', onlyArtillery: true }
 ];
 
 const SPECIALIZATION_POOL = [
     { id: 'spec_speed_aura', label: '加速靈氣', desc: '所有塔攻速 +10%', condition: (t) => (t.upgradeStats?.speed || 0) >= 4 },
-    { id: 'spec_fire_global', label: '火之靈氣', desc: '所有塔命中附加灼傷（3秒，持續刷新）', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 4 },
-    { id: 'spec_water_global', label: '水之靈氣', desc: '所有塔命中附加凍傷（3秒，最高100層）', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 4 },
-    { id: 'spec_wood_global', label: '木專精', desc: '所有塔命中附加中毒（每秒 30% 基礎木傷，並延長 5 秒）', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 4 },
+    { id: 'spec_fire_global', label: '火之靈氣', desc: '附近五格塔命中怪物附加灼傷效果（基礎持續3秒，擊中後刷新持續時間）', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 4 },
+    { id: 'spec_water_global', label: '水之靈氣', desc: '附近五格塔命中怪物附加凍傷效果（基礎持續3秒，擊中後刷新持續時間）', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 4 },
+    { id: 'spec_wood_global', label: '木專精', desc: '附近五格塔命中怪物附加中毒效果（基礎持續5秒，擊中後刷新持續時間）', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 4 },
     { id: 'spec_crit_global', label: '暴擊靈氣', desc: '所有塔暴擊機率 +20%', condition: (t) => (t.upgradeStats?.crit_chance || 0) >= 4 },
     { id: 'spec_crit_dmg_global', label: '暴傷靈氣', desc: '所有塔暴擊傷害 +20%', condition: (t) => (t.upgradeStats?.crit_dmg || 0) >= 4 },
     { id: 'spec_chain_no_limit', label: '連鎖彈射', desc: '連鎖傷害不衰減，且可重複連鎖已命中目標', condition: (t) => (t.upgradeStats?.proj_chain_up || 0) >= 3 },
@@ -71,26 +71,26 @@ const SPECIALIZATION_POOL = [
     { id: 'spec_tower_crit_random', label: '隨機暴傷', desc: '該塔暴擊額外 +10%~1000%' },
     { id: 'spec_tower_stun_02', label: '攻擊暈眩', desc: '該塔每次攻擊暈眩 0.2 秒' },
     { id: 'spec_tower_fire_explosion', label: '火焰爆炸', desc: '該塔命中觸發 50% 基礎火焰爆炸（3 格）' },
-    { id: 'spec_tower_attr_off_triple', label: '棄屬性強化', desc: '屬性攻擊失效，基礎傷害 x3' },
+    { id: 'spec_tower_attr_off_triple', label: '基礎屬性強化', desc: '屬性攻擊失效，基礎傷害 x3' },
     { id: 'spec_tower_half_dmg_double_speed', label: '高速連擊', desc: '基礎傷害減半，攻速翻倍' },
     { id: 'spec_tower_bleed', label: '血蝕之刃', desc: '流血傷害 +200%，流血持續時間改為 10 秒', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 3 },
     { id: 'spec_tower_poison', label: '毒蝕蔓延', desc: '所有塔中毒傷害 +200%、中毒持續至少 10 秒，並附加 15% 緩速', condition: (t) => (t.upgradeStats?.poison_dmg || 0) >= 3 },
     { id: 'spec_tower_poison_frequency', label: '劇毒高頻', desc: '所有塔中毒頻率 +200%，並附加 15% 緩速', condition: (t) => (t.upgradeStats?.poison_frequency || 0) >= 3 },
-    { id: 'spec_global_wood_base', label: '木源增幅', desc: '全塔基礎傷害 +20%', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 1 && (t.upgradeStats?.base_dmg || 0) >= 1 },
-    { id: 'spec_global_wood_crit_dmg', label: '木源暴傷', desc: '全塔暴擊傷害 +25%', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 1 && (t.upgradeStats?.crit_dmg || 0) >= 1 },
-    { id: 'spec_global_water_base', label: '水源增幅', desc: '全塔基礎傷害 +20%', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 1 && (t.upgradeStats?.base_dmg || 0) >= 1 },
-    { id: 'spec_global_water_speed', label: '水源急速', desc: '全塔攻速 +12%', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 1 && (t.upgradeStats?.speed || 0) >= 1 },
-    { id: 'spec_global_fire_speed', label: '炎源急速', desc: '全塔攻速 +12%', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 1 && (t.upgradeStats?.speed || 0) >= 1 },
-    { id: 'spec_global_fire_crit', label: '炎源暴擊', desc: '全塔暴擊率 +10%', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 1 && (t.upgradeStats?.crit_chance || 0) >= 1 },
-    { id: 'spec_global_bleed_speed', label: '血戰急速', desc: '全塔攻速 +10%', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 1 && (t.upgradeStats?.speed || 0) >= 1 },
-    { id: 'spec_global_bleed_base', label: '血戰強襲', desc: '全塔基礎傷害 +15%', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 1 && (t.upgradeStats?.base_dmg || 0) >= 1 },
-    { id: 'spec_magic_wood_base', label: '木法增幅', desc: '木屬性法術塔基礎傷害 +35%', condition: (t) => (t.upgradeStats?.elemental_wood_magic || 0) >= 1 && (t.upgradeStats?.base_magic_dmg || 0) >= 1 },
-    { id: 'spec_magic_water_frost_trigger', label: '寒脈共振', desc: '水法凍傷流派觸發率 +25%', condition: (t) => (t.upgradeStats?.elemental_water_magic || 0) >= 1 && (t.upgradeStats?.magic_water_frostbite_talent || 0) >= 1 },
-    { id: 'spec_magic_fire_speed', label: '炎術疾馳', desc: '火屬性法術塔攻速 +25%', condition: (t) => (t.upgradeStats?.elemental_fire_magic || 0) >= 1 },
-    { id: 'spec_magic_combo_wood_fire', label: '焚森術', desc: '木+火法術改為複合法術（覆蓋原本木/火法術）', condition: (t) => (t.upgradeStats?.elemental_wood_magic || 0) >= 1 && (t.upgradeStats?.elemental_fire_magic || 0) >= 1 },
-    { id: 'spec_magic_combo_fire_water', label: '蒸潮術', desc: '火+水法術改為複合法術（覆蓋原本火/水法術）', condition: (t) => (t.upgradeStats?.elemental_fire_magic || 0) >= 1 && (t.upgradeStats?.elemental_water_magic || 0) >= 1 },
-    { id: 'spec_magic_combo_water_wood', label: '潮林術', desc: '水+木法術改為複合法術（覆蓋原本水/木法術）', condition: (t) => (t.upgradeStats?.elemental_water_magic || 0) >= 1 && (t.upgradeStats?.elemental_wood_magic || 0) >= 1 },
-    { id: 'spec_magic_dual_ailment', label: '雙異常共鳴', desc: '任兩種異常法術天賦啟用後，觸發率與異常效果提升', condition: (t) => hasAnyTwoAilmentTalents(t) }
+    { id: 'spec_global_wood_base', label: '木源增幅', desc: '全塔基礎傷害 +20%，木屬性傷害 +25%', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 1 && (t.upgradeStats?.base_dmg || 0) >= 1 },
+    { id: 'spec_global_wood_crit_dmg', label: '木源暴傷', desc: '全塔暴擊傷害 +25%，木屬性暴擊傷害 +25%', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 1 && (t.upgradeStats?.crit_dmg || 0) >= 1 },
+    { id: 'spec_global_water_base', label: '水源增幅', desc: '全塔基礎傷害 +20%，水屬性傷害 +25%', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 1 && (t.upgradeStats?.base_dmg || 0) >= 1 },
+    { id: 'spec_global_water_speed', label: '水源急速', desc: '全塔攻速 +12%，水屬性傷害 +25%', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 1 && (t.upgradeStats?.speed || 0) >= 1 },
+    { id: 'spec_global_fire_speed', label: '炎源急速', desc: '全塔攻速 +12%，火屬性傷害 +25%', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 1 && (t.upgradeStats?.speed || 0) >= 1 },
+    { id: 'spec_global_fire_crit', label: '炎源暴擊', desc: '全塔暴擊率 +10%，火屬性傷害 +25%', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 1 && (t.upgradeStats?.crit_chance || 0) >= 1 },
+    { id: 'spec_global_bleed_speed', label: '血戰急速', desc: '全塔攻速 +10%，木屬性傷害 +25%', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 1 && (t.upgradeStats?.speed || 0) >= 1 },
+    { id: 'spec_global_bleed_base', label: '血戰強襲', desc: '全塔基礎傷害 +15%，木屬性傷害 +25%', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 1 && (t.upgradeStats?.base_dmg || 0) >= 1 },
+    { id: 'spec_magic_wood_base', label: '木法增幅', desc: '該塔木屬性法術傷害 +100%', condition: (t) => (t.upgradeStats?.elemental_wood_magic || 0) >= 1 && (t.upgradeStats?.base_magic_dmg || 0) >= 1 },
+    { id: 'spec_magic_water_frost_trigger', label: '寒脈共振', desc: '該塔水屬性法術傷害 +100%', condition: (t) => (t.upgradeStats?.elemental_water_magic || 0) >= 1 && (t.upgradeStats?.magic_water_frostbite_talent || 0) >= 1 },
+    { id: 'spec_magic_fire_speed', label: '炎術疾馳', desc: '該塔火屬性法術傷害 +100%', condition: (t) => (t.upgradeStats?.elemental_fire_magic || 0) >= 1 },
+    { id: 'spec_magic_combo_wood_fire', label: '焚森術', desc: '攻擊時機率觸發法術-焚森術（取代原本龍捲風/炎爆）', condition: (t) => (t.upgradeStats?.elemental_wood_magic || 0) >= 1 && (t.upgradeStats?.elemental_fire_magic || 0) >= 1 },
+    { id: 'spec_magic_combo_fire_water', label: '蒸潮術', desc: '攻擊時機率觸發法術-蒸潮術（取代原本炎爆/水球）', condition: (t) => (t.upgradeStats?.elemental_fire_magic || 0) >= 1 && (t.upgradeStats?.elemental_water_magic || 0) >= 1 },
+    { id: 'spec_magic_combo_water_wood', label: '潮林術', desc: '攻擊時機率觸發法術-潮林術（取代原本水球/龍捲風）', condition: (t) => (t.upgradeStats?.elemental_water_magic || 0) >= 1 && (t.upgradeStats?.elemental_wood_magic || 0) >= 1 },
+    { id: 'spec_magic_dual_ailment', label: '雙異常共鳴', desc: '該塔造成的異常效果及異常傷害提升200%', condition: (t) => hasAnyTwoAilmentTalents(t) }
 ];
 
 const SUPPORT_UPGRADE_POOL = [
@@ -98,9 +98,11 @@ const SUPPORT_UPGRADE_POOL = [
     { id: 'support_speed_aura_up', label: '強化速度靈氣效果', desc: '速度靈氣效果每級 +15%', requireAura: 'speed' },
     { id: 'support_slow_aura_up', label: '強化緩速靈氣效果', desc: '緩速靈氣效果每級 +15%', requireAura: 'slow' },
     { id: 'support_crit_aura_up', label: '強化暴擊靈氣效果', desc: '暴擊靈氣效果每級 +15%', requireAura: 'crit' },
+    { id: 'support_spell_aura_up', label: '強化法術靈氣效果', desc: '法術靈氣每級 +20%（最高 5 級）', requireAura: 'spell', maxCount: 5 },
     { id: 'support_convert_speed_aura', label: '轉換為速度靈氣', desc: '將攻擊靈氣轉為速度靈氣（僅一次）', requireAura: 'attack', isConvert: true },
     { id: 'support_convert_slow_aura', label: '轉換為緩速靈氣', desc: '將攻擊靈氣轉為緩速靈氣（僅一次）', requireAura: 'attack', isConvert: true },
     { id: 'support_convert_crit_aura', label: '轉換為暴擊靈氣', desc: '將攻擊靈氣轉為暴擊靈氣（僅一次）', requireAura: 'attack', isConvert: true },
+    { id: 'support_convert_spell_aura', label: '轉換為法術靈氣', desc: '將攻擊靈氣轉為法術靈氣（僅一次）', requireAura: 'attack', isConvert: true },
     { id: 'support_aura_range_up', label: '範圍增加 1 格', desc: '當前靈氣範圍 +1' },
     { id: 'support_gain_level_book', label: '獲得經驗之書 x1', desc: '立即獲得 1 本經驗之書' },
     { id: 'support_gain_speed_book', label: '獲得速度之書 x1', desc: '立即獲得 1 本速度之書' },
@@ -110,10 +112,10 @@ const SUPPORT_UPGRADE_POOL = [
 ];
 
 const SUPPORT_SPECIALIZATION_POOL = [
-    { id: 'support_spec_level_books_10', label: '經驗之書 x10', desc: '立即獲得 10 本經驗之書' },
-    { id: 'support_spec_speed_books_10', label: '速度之書 x10', desc: '立即獲得 10 本速度之書' },
-    { id: 'support_spec_power_books_10', label: '力量之書 x10', desc: '立即獲得 10 本力量之書' },
-    { id: 'support_spec_crit_books_10', label: '暴擊之書 x10', desc: '立即獲得 10 本暴擊之書' },
+    { id: 'support_spec_level_books_10', label: '經驗之書 x5', desc: '立即獲得 5 本經驗之書' },
+    { id: 'support_spec_speed_books_10', label: '速度之書 x15', desc: '立即獲得 15 本速度之書' },
+    { id: 'support_spec_power_books_10', label: '力量之書 x15', desc: '立即獲得 15 本力量之書' },
+    { id: 'support_spec_crit_books_10', label: '暴擊傷害之書 x5', desc: '立即獲得 5 本暴擊之書' },
     { id: 'support_spec_double_aura', label: '靈氣效果翻倍', desc: '當前塔的靈氣效果提升一倍' },
     { id: 'support_spec_range_5', label: '靈氣範圍 +5', desc: '當前塔的靈氣範圍增加五格' },
     { id: 'support_spec_lucky_aura', label: '幸運靈氣', desc: '附近塔暴擊傷害每秒隨機增加 0~2 倍' },
@@ -347,7 +349,7 @@ const Game = ({ onExit }) => {
         mobsCount: 0,
         waveActive: false,
         gameSpeed: 1,
-        gameSpeedCap: 2,
+        gameSpeedCap: 5,
         pendingUpgradePoints: 0
     });
 
@@ -378,7 +380,6 @@ const Game = ({ onExit }) => {
         [ITEM_TYPES.CONSUMABLE]: 0,
         [ITEM_TYPES.EQUIPMENT]: 0
     });
-    const [mobileInfoTab, setMobileInfoTab] = useState('wave'); // wave | towers | rank
     const [mobilePanelTab, setMobilePanelTab] = useState('consumable'); // consumable | equipment | wave | towers | rank
     const [topBarHeight, setTopBarHeight] = useState(70);
     const [bgmEnabled, setBgmEnabled] = useState(settings?.bgmEnabled !== false);
@@ -741,21 +742,24 @@ const Game = ({ onExit }) => {
             const eng = engineRef.current;
             const images = visualsRef.current;
             const nowMs = performance.now();
-            const hasAttackEffect = eng.effects.some((eff) => eff.type === 'hit' || eff.type === 'slash');
-            const hasExplosionEffect = eng.effects.some((eff) => (
-                eff.type === 'magic_burst'
-                || eff.type === 'fire_burst'
-                || eff.type === 'water_burst'
-                || eff.type === 'wood_burst'
-            ));
+            const canPlayCombatSfx = !eng.paused && !isPausedRef.current && !isInteractionModalOpenRef.current && !gameOverRef.current;
+            if (canPlayCombatSfx) {
+                const hasAttackEffect = eng.effects.some((eff) => eff.type === 'hit' || eff.type === 'slash');
+                const hasExplosionEffect = eng.effects.some((eff) => (
+                    eff.type === 'magic_burst'
+                    || eff.type === 'fire_burst'
+                    || eff.type === 'water_burst'
+                    || eff.type === 'wood_burst'
+                ));
 
-            if (hasAttackEffect && nowMs - combatSfxCooldownRef.current.attack > 90) {
-                triggerSfx('attack');
-                combatSfxCooldownRef.current.attack = nowMs;
-            }
-            if (hasExplosionEffect && nowMs - combatSfxCooldownRef.current.explosion > 160) {
-                triggerSfx('explosion');
-                combatSfxCooldownRef.current.explosion = nowMs;
+                if (hasAttackEffect && nowMs - combatSfxCooldownRef.current.attack > 90) {
+                    triggerSfx('attack');
+                    combatSfxCooldownRef.current.attack = nowMs;
+                }
+                if (hasExplosionEffect && nowMs - combatSfxCooldownRef.current.explosion > 160) {
+                    triggerSfx('explosion');
+                    combatSfxCooldownRef.current.explosion = nowMs;
+                }
             }
 
             ctx.clearRect(0, 0, 600, 600);
@@ -1102,6 +1106,7 @@ const Game = ({ onExit }) => {
             const filtered = SUPPORT_UPGRADE_POOL.filter((option) => {
                 if (option.requireAura && option.requireAura !== (tower.supportAuraType || 'attack')) return false;
                 if (option.isConvert && (tower.supportAuraType || 'attack') !== 'attack') return false;
+                if (option.maxCount && (tower.upgradeStats?.[option.id] || 0) >= option.maxCount) return false;
                 return true;
             });
             return shuffle(filtered).slice(0, 3);
@@ -1622,8 +1627,8 @@ const Game = ({ onExit }) => {
     const isMobile = viewport.width <= 980;
     const baseMapSize = 600;
     const mobileTopBarOffset = topBarHeight;
-    const mobileBottomPanelHeight = 232;
-    const mobileMiddleHeight = Math.max(220, viewport.height - mobileTopBarOffset - mobileBottomPanelHeight - 8);
+    const mobileBottomPanelHeight = Math.max(280, Math.min(430, Math.floor(viewport.height * 0.46)));
+    const mobileMiddleHeight = Math.max(180, viewport.height - mobileTopBarOffset - mobileBottomPanelHeight - 8);
     const mapScale = isMobile
         ? Math.min(1, (viewport.width - 16) / baseMapSize, mobileMiddleHeight / baseMapSize)
         : 1;
@@ -1645,9 +1650,11 @@ const Game = ({ onExit }) => {
     }
     const mobileVisibleInventorySlots = visibleInventorySlots.slice(0, 8);
     const mobileInfoTabs = [
-        { key: 'wave', label: '關卡資訊' },
+        { key: 'wave', label: '關卡' },
         { key: 'towers', label: '塔資訊' },
-        { key: 'rank', label: '排名' }
+        { key: 'tower_detail', label: '塔詳情' },
+        { key: 'rank', label: '排名' },
+        { key: 'console', label: 'Console' }
     ];
 
     return (
@@ -2381,13 +2388,15 @@ const Game = ({ onExit }) => {
                     overflow: 'hidden',
                     zIndex: 12
                 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '6px' }}>
+                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
                         {[
                             { key: 'consumable', label: '道具' },
                             { key: 'equipment', label: '裝備' },
                             { key: 'wave', label: '關卡' },
                             { key: 'towers', label: '塔資訊' },
-                            { key: 'rank', label: '排名' }
+                            { key: 'tower_detail', label: '塔詳情' },
+                            { key: 'rank', label: '排名' },
+                            { key: 'console', label: 'Console' }
                         ].map((tab) => (
                             <button
                                 key={`mobile-panel-${tab.key}`}
@@ -2395,11 +2404,13 @@ const Game = ({ onExit }) => {
                                     setMobilePanelTab(tab.key);
                                     if (tab.key === 'consumable') setInventoryTab(ITEM_TYPES.CONSUMABLE);
                                     if (tab.key === 'equipment') setInventoryTab(ITEM_TYPES.EQUIPMENT);
-                                    if (tab.key === 'wave' || tab.key === 'towers' || tab.key === 'rank') setMobileInfoTab(tab.key);
                                 }}
                                 style={{
                                     padding: '4px 6px',
                                     fontSize: '0.72rem',
+                                    minWidth: '72px',
+                                    whiteSpace: 'nowrap',
+                                    flex: '0 0 auto',
                                     border: mobilePanelTab === tab.key ? '1px solid #7cff9a' : '1px solid #555',
                                     background: mobilePanelTab === tab.key ? '#213025' : '#1f1f1f',
                                     color: '#ddd'
@@ -2473,7 +2484,7 @@ const Game = ({ onExit }) => {
                         )}
 
                         <div style={{ fontSize: '0.76rem', lineHeight: 1.35, overflowY: 'auto', minHeight: 0 }}>
-                            {(mobilePanelTab === 'wave' || mobileInfoTab === 'wave') && mobilePanelTab === 'wave' && (
+                            {mobilePanelTab === 'wave' && (
                                 waveInfo ? (
                                     <div style={{ display: 'grid', gap: '8px' }}>
                                         <div style={{ color: '#8dd2ff', fontSize: '0.8rem' }}>當波怪物資訊</div>
@@ -2523,7 +2534,7 @@ const Game = ({ onExit }) => {
                                     <div style={{ color: '#8a8a8a' }}>尚無關卡資訊</div>
                                 )
                             )}
-                            {(mobilePanelTab === 'towers' || mobileInfoTab === 'towers') && mobilePanelTab === 'towers' && (
+                            {mobilePanelTab === 'towers' && (
                                 towerRows.length === 0 ? (
                                     <div style={{ color: '#8a8a8a' }}>目前還沒有塔</div>
                                 ) : (
@@ -2569,7 +2580,43 @@ const Game = ({ onExit }) => {
                                     </div>
                                 )
                             )}
-                            {(mobilePanelTab === 'rank' || mobileInfoTab === 'rank') && mobilePanelTab === 'rank' && (
+                            {mobilePanelTab === 'tower_detail' && (
+                                selectedTower && selectedTowerDetail ? (
+                                    <div style={{ display: 'grid', gap: '6px' }}>
+                                        <div style={{ color: '#8dd2ff', fontSize: '0.8rem' }}>選取塔詳細資訊</div>
+                                        <div style={{ border: '1px solid #2f2f2f', borderRadius: '6px', padding: '6px', color: '#ddd' }}>
+                                            <div>名稱: {getTowerName(selectedTower.type)}</div>
+                                            <div>等級: {selectedTower.level}</div>
+                                            {selectedTowerDetail.equipmentName && <div>裝備: {selectedTowerDetail.equipmentName}</div>}
+                                            <div>傷害: {Math.floor(selectedTowerDetail.initialDamage)} + {Math.floor(selectedTowerDetail.bonusBaseDamage)} + 火 {Math.floor(selectedTowerDetail.extraFire)} / 水 {Math.floor(selectedTowerDetail.extraWater)} / 木 {Math.floor(selectedTowerDetail.extraWood)}</div>
+                                            <div>暴擊率: {selectedTowerDetail.initialCrit.toFixed(0)}% + ({selectedTowerDetail.extraCrit >= 0 ? '+' : ''}{selectedTowerDetail.extraCrit.toFixed(0)}%)</div>
+                                            <div>暴擊傷害: {INITIAL_CRIT_DMG.toFixed(2)} + ({selectedTowerDetail.extraCritDmg >= 0 ? '+' : ''}{selectedTowerDetail.extraCritDmg.toFixed(2)})</div>
+                                            <div>攻速: {selectedTowerDetail.initialSpeed.toFixed(2)} + ({selectedTowerDetail.extraSpeed >= 0 ? '+' : ''}{selectedTowerDetail.extraSpeed.toFixed(2)})</div>
+                                            <div>距離: {selectedTowerDetail.initialRange.toFixed(1)} + ({selectedTowerDetail.extraRange >= 0 ? '+' : ''}{selectedTowerDetail.extraRange.toFixed(1)})</div>
+                                            <div style={{ color: '#ffd99b' }}>靈氣加成: 傷 +{selectedTowerDetail.auraSnapshot.damagePct.toFixed(0)}% | 速 +{selectedTowerDetail.auraSnapshot.speedPct.toFixed(0)}% | 暴 +{selectedTowerDetail.auraSnapshot.critChancePct.toFixed(0)}%</div>
+                                            <div style={{ color: '#ffd99b' }}>靈氣暴傷加成: +{selectedTowerDetail.auraSnapshot.critDmgBonus.toFixed(2)}</div>
+                                            {selectedTowerDetail.resonanceNames?.length > 0 && (
+                                                <div style={{ color: '#9ad7ff' }}>共鳴: {selectedTowerDetail.resonanceNames.join('、')}</div>
+                                            )}
+                                        </div>
+                                        <div style={{ border: '1px solid #2f2f2f', borderRadius: '6px', padding: '6px' }}>
+                                            <div style={{ color: '#8dd2ff', marginBottom: '4px' }}>已選天賦</div>
+                                            {selectedTowerDetail.talentRows.length === 0 ? (
+                                                <div style={{ color: '#8a8a8a' }}>尚未選擇天賦</div>
+                                            ) : (
+                                                selectedTowerDetail.talentRows.map((row) => (
+                                                    <div key={`mobile-talent-${row.key}`} style={{ color: '#d7d7d7' }}>
+                                                        {row.label} {row.isSpec ? '專精' : (row.isMax ? 'LVMax' : `LV${row.level}`)}
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div style={{ color: '#8a8a8a' }}>請先點選一座塔</div>
+                                )
+                            )}
+                            {mobilePanelTab === 'rank' && (
                                 towerRankRows.length === 0 ? (
                                     <div style={{ color: '#8a8a8a' }}>目前沒有可排名的塔</div>
                                 ) : (
@@ -2592,14 +2639,52 @@ const Game = ({ onExit }) => {
                                     </div>
                                 )
                             )}
+                            {mobilePanelTab === 'console' && (
+                                <div style={{ display: 'grid', gap: '8px' }}>
+                                    <div style={{ border: '1px solid #3b3b3b', borderRadius: '6px', padding: '6px' }}>
+                                        <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>更新日誌</div>
+                                        {UPDATE_LOG_ITEMS.map((item, idx) => (
+                                            <div key={`mobile-update-${idx}`} style={{ color: '#cfd6df', marginBottom: '3px' }}>
+                                                {idx + 1}. {item}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div style={{ border: '1px solid #3b3b3b', borderRadius: '6px', padding: '6px' }}>
+                                        <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>Console</div>
+                                        {consoleLog.length === 0 ? (
+                                            <div style={{ color: '#8a8a8a' }}>尚無紀錄</div>
+                                        ) : (
+                                            consoleLog.map((line, idx) => (
+                                                <div key={`mobile-console-${idx}`} style={{ color: '#9bcf9f', borderBottom: '1px solid #272727', padding: '3px 0' }}>
+                                                    {line}
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                             {(mobilePanelTab === 'consumable' || mobilePanelTab === 'equipment') && (
                                 <>
+                                    <div style={{ color: '#8dd2ff' }}>道具說明</div>
                                     {!selectedInventoryItem && (
-                                        <div style={{ marginTop: '4px', color: '#8dd2ff' }}>選取道具後點地圖上的塔使用</div>
+                                        <div style={{ marginTop: '4px', color: '#8dd2ff' }}>
+                                            選取道具後點地圖上的塔使用
+                                        </div>
                                     )}
                                     {selectedInventoryItem && (
-                                        <div style={{ marginTop: '4px', color: '#9bcf9f' }}>
-                                            已選: {selectedInventoryItem.name} x{selectedInventoryItem.count}
+                                        <div style={{ marginTop: '4px', color: '#ddd', border: '1px solid #2f2f2f', borderRadius: '6px', padding: '6px' }}>
+                                            <div style={{ color: '#fff', fontWeight: 700 }}>
+                                                {selectedInventoryItem.name} x{selectedInventoryItem.count}
+                                            </div>
+                                            <div style={{ color: '#bfc6d1', marginTop: '4px' }}>{selectedInventoryItem.description}</div>
+                                            <div style={{ color: '#8dd2ff', marginTop: '4px' }}>
+                                                類型: {selectedInventoryItem.type === ITEM_TYPES.EQUIPMENT ? '裝備（每塔僅 1 件，不可卸下）' : '道具（點塔使用）'}
+                                            </div>
+                                            <div style={{ marginTop: '6px' }}>
+                                                <button onClick={() => setSelectedItemId(null)} style={{ fontSize: '0.72rem', padding: '3px 8px' }}>
+                                                    取消選取
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
                                 </>

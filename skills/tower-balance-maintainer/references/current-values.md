@@ -1,4 +1,4 @@
-# 目前遊戲數值總表（中文）
+﻿# 目前遊戲數值總表（中文）
 
 最後同步日期：2026-02-21  
 對應程式版本來源：`src/data/constants.js`、`src/engine/GameEngine.js`、`src/components/Game/Game.jsx`
@@ -88,7 +88,7 @@
 - 緩速塔限定：
   - `slow_power_up`：緩速效果 +10%（可疊）。(該塔取得3次後 即不會再次出現)
 - 砲擊塔限定：
-  - `knockback_up`：攻擊爆炸擊退距離 +0.5。
+  - `knockback_up`：攻擊爆炸擊退距離 +0.25；每次擊退使該砲塔對該怪物承傷 +10%，同一座砲塔對同一隻怪物最多 +50%。
   - `knockback_stun`：攻擊爆炸附加怪物暈眩0.2秒。
   - `knockback_radius`：攻擊爆炸範圍 +1格。
 - 法術塔限定(法術塔不使用通用天賦)：
@@ -335,7 +335,7 @@
 ### E. 地形對異常加成
 - swamp：凍傷每層增傷 +30%，灼傷傷害 -20%
 - desert：灼傷傷害 +40%，凍傷每層增傷 -20%
-- orest：中毒傷害 +30%
+- orest：中毒傷害 +30%
 
 ### F. 新增專精重置道具
 - 新增 specialization_reset_scroll，可重置「已選過專精的 Lv10 塔」並重新選擇專精
@@ -343,7 +343,7 @@
 ### G. 掉落權重調整
 - 道具掉落改為「期望值封頂 + 每隻怪掉落上限」
 - 一般怪最多 1 件，Boss 最多 2 件
-- 保留 Boss 額外 uild_book 10% 機率
+- 保留 Boss 額外 build_book 10% 機率
 ## 2026-02-23 更新（全域複合專精與法術複合專精）
 
 ### 1) 全域複合型條件專精（新增）
@@ -389,11 +389,11 @@
 - 木+火、水+木：控場區會持續緩速並牽引怪物。
 - 火+水：控場區會持續強化緩速，並有機率造成短暫硬控。
 ## 2026-02-23 更新（急救套件全域即時使用）
-- epair_kit 改為點擊後立即使用（不需點塔）。
+- repair_kit 改為點擊後立即使用（不需點塔）。
 - 使用時若生命未滿：恢復 1 點生命。
 - 使用時若生命已滿：同時擴充最大生命 +1，並回滿至新上限。
 ## 2026-02-23 更新（急救套件雙擊使用）
-- epair_kit 調整為「連點兩下立即使用」。
+- repair_kit 調整為「連點兩下立即使用」。
 - 若生命未滿：恢復 1 點生命。
 - 若生命已滿：先擴充最大生命 +1，再恢復 1 點生命。
 ## 2026-02-23 更新（怪物數量曲線與詞墜）
@@ -402,18 +402,162 @@
 - mob_density：每級 +0.25 倍，最高 x2。
 - 新詞墜：
   - mob_count_up（30波後）：怪物數量 x1.25~x3，權重10
-  - oss_count_up（30波後）：額外BOSS +1~+5，權重10
-  - rostbite_dmg_reduction（10波後）：100波內遞進至95%
+  - boss_count_up（30波後）：額外BOSS +1~+5，權重10
+  - frostbite_dmg_reduction（10波後）：100波內遞進至95%
   - scorch_dmg_reduction（10波後）：100波內遞進至95%
 ## 2026-02-23 更新（依 monster-info 掉落實作）
 - 一般怪掉落改為「各條目獨立判定」，並套用 item_drop_rate 倍率。
 - 四屬怪掉落表：
-  - normal：crit_book 5%、speed_book 2%、uild_book 2%
-  - fire：crit_book 5%、power_book 2%、uild_book 2%
-  - water：speed_book 5%、crit_book 2%、uild_book 2%
-  - wood：power_book 5%、crit_book 2%、uild_book 2%
+  - normal：crit_book 5%、speed_book 2%、build_book 2%
+  - fire：crit_book 5%、power_book 2%、build_book 2%
+  - water：speed_book 5%、crit_book 2%、build_book 2%
+  - wood：power_book 5%、crit_book 2%、build_book 2%
 - Boss 額外掉落改為獨立判定：
-  - uild_book 20%、level_book 10%、specialization_reset_scroll 2%
+  - build_book 20%、level_book 10%、specialization_reset_scroll 2%
   - lubricant/full_firepower/chain_lightning 各 2%
   - courage_banner/slaughter_banner/agility_banner 各 3%
-- 移除舊的 Boss 固定 uild_book 10% 額外判定。
+- 移除舊的 Boss 固定 build_book 10% 額外判定。
+## 2026-02-24 更新（共鳴效果與條件明細）
+以下以 `src/engine/GameEngine.js` 的 `getResonanceCatalog()` 為準。
+
+### 1) 沼雷渦流（`res_swamp_chain_control`）
+- 觸發條件：地形 `swamp` + 塔型 `projectile_slow` + 裝備 `chain_lightning`
+- 效果：
+  - 緩速效果倍率 `x1.2`（`slowEffectMult: 1.2`）
+  - 閃電鏈傷害倍率 `x1.35`（`chainLightningDamageMult: 1.35`）
+  - 閃電鏈額外連鎖 `+6`（`chainLightningChainBonus: 6`）
+  - 閃電鏈額外麻痺機率 `+5%`（`chainLightningParalyzeBonus: 0.05`）
+
+### 2) 高地鷹眼（`res_highland_archer_courage`）
+- 觸發條件：地形 `highland` + 塔型 `projectile` + 裝備 `courage_banner`
+- 效果：
+  - 傷害倍率 `x1.15`（`damageMult: 1.15`）
+  - 暴擊機率 `+20%`（`critChanceBonus: 0.2`）
+
+### 3) 焦土重砲（`res_desert_artillery_firepower`）
+- 觸發條件：地形 `desert` + 塔型 `projectile_aoe` + 裝備 `full_firepower`
+- 效果：
+  - 傷害倍率 `x1.3`（`damageMult: 1.3`）
+  - 擊退距離倍率 `x1.2`（`knockbackDistanceMult: 1.2`）
+  - 擊退半徑 `+1`（`knockbackRadiusBonus: 1`）
+
+### 4) 森血狩獵（`res_forest_melee_slaughter`）
+- 觸發條件：地形 `forest` + 塔型 `melee` + 裝備 `slaughter_banner`
+- 效果：
+  - 流血傷害倍率 `x1.8`（`bleedDamageMult: 1.8`）
+  - 流血持續時間 `+2 秒`（`bleedDurationBonus: 2`）
+  - 暴擊傷害 `+25%`（`critDmgBonus: 0.25`）
+
+### 5) 遺跡雷術（`res_ruins_magic_chain`）
+- 觸發條件：地形 `ruins` + 塔型 `magic` + 裝備 `chain_lightning`
+- 效果：
+  - 攻速倍率 `x1.15`（`speedMult: 1.15`）
+  - 閃電鏈傷害倍率 `x1.2`（`chainLightningDamageMult: 1.2`）
+  - 閃電鏈額外麻痺機率 `+4%`（`chainLightningParalyzeBonus: 0.04`）
+
+### 6) 平原突襲（`res_plain_melee_agility`）
+- 觸發條件：地形 `plain` + 塔型 `melee` + 裝備 `agility_banner`
+- 效果：
+  - 攻速倍率 `x1.2`（`speedMult: 1.2`）
+  - 傷害倍率 `x1.15`（`damageMult: 1.15`）
+
+## 2026-02-24 文案對齊清單（以 `src/components/Game/Game.jsx` 為準）
+> 用途：這份清單是「遊戲內實際顯示文字」對照。要調整三選一/專精文案，請以此區塊與 `Game.jsx` 同步。
+
+### A) 一般塔三選一（`UPGRADE_POOL`）
+- `base_magic_dmg`｜法術基礎傷害 +20｜法術塔基礎傷害提高 20｜條件：`onlyMagic`
+- `speed_magic`｜急速施法｜攻擊間隔縮短 20%（最多 5 次）｜條件：`onlyMagic`、`maxCount=5`
+- `trigger_magic`｜法術觸發率 +20%｜元素法術觸發機率提高 20%（最多 3 次）｜條件：`onlyMagic`、`onlyAfterMagicElement`、`maxCount=3`
+- `elemental_fire_magic`｜法術-炎爆｜攻擊時機率觸發炎爆，升級後提升傷害量｜條件：`onlyMagic`、`magicElement=fire`
+- `elemental_water_magic`｜法術-水球｜攻擊時機率觸發水球，升級後提升傷害量｜條件：`onlyMagic`、`magicElement=water`
+- `elemental_wood_magic`｜法術-龍捲風｜攻擊時機率觸發龍捲風（龍捲風在場上持續3秒，每秒對範圍內怪物造成傷害），升級後提升傷害量｜條件：`onlyMagic`、`magicElement=wood`
+- `magic_wood_poison_talent`｜木法毒蝕｜龍捲風每次造成傷害對怪物附加中毒效果｜條件：`onlyMagic`、`requiredMagicElement=wood`、`maxCount=3`
+- `magic_water_frostbite_talent`｜水法凍傷｜水球擊中怪物附加5層凍傷效果｜條件：`onlyMagic`、`requiredMagicElement=water`、`maxCount=3`
+- `magic_fire_scorch_talent`｜火法灼燒｜炎爆擊中怪物附加1層灼燒效果｜條件：`onlyMagic`、`requiredMagicElement=fire`、`maxCount=3`
+- `fire_dmg`｜火屬性附加傷害 +25%｜增加火屬性追加傷害，並附加灼傷（3秒）｜條件：`element=fire`
+- `water_dmg`｜水屬性附加傷害 +25%｜增加水屬性追加傷害，並附加凍傷（3秒）｜條件：`element=water`
+- `wood_dmg`｜木屬性附加傷害 +25%｜增加木屬性追加傷害，並附加中毒效果｜條件：`element=wood`
+- `poison_dmg`｜中毒傷害 +40%｜木屬性傷害帶來的中毒每級 +40% 傷害｜條件：`element=wood`、`maxCount=3`
+- `poison_duration`｜中毒時間 +2秒｜木屬性傷害帶來的中毒持續時間 +2 秒｜條件：`element=wood`、`maxCount=3`
+- `poison_frequency`｜中毒頻率 +25%｜木屬性傷害帶來的中毒傷害頻率每級 +25%｜條件：`element=wood`
+- `base_dmg`｜基礎傷害 +25%｜直接提升基礎傷害
+- `crit_chance`｜暴擊率 +10%｜提高暴擊觸發機率
+- `crit_dmg`｜暴擊傷害 +20%｜提高暴擊倍率
+- `speed`｜攻速 +10%｜縮短攻擊間隔｜條件：`maxCount=4`
+- `range`｜攻擊距離 +1｜提升攻擊範圍｜條件：`maxCount=4`
+- `proj_chain_up`｜連鎖次數 +1｜投射物額外連鎖一次｜條件：`onlyProjectile`、`maxCount=4`
+- `proj_count_up`｜攻擊數量 +1｜投射物額外命中目標 +1｜條件：`onlyProjectile`、`maxCount=2`
+- `melee_bleed`｜附加流血｜近戰命中後 4 秒流血，每秒 30% 傷害（每級 +30%，不可疊加）｜條件：`onlyMelee`
+- `addition_attack`｜額外攻擊 +1｜命中時追加 50% 基礎傷害攻擊｜條件：`onlyMelee`、`maxCount=3`
+- `slow_power_up`｜緩速效果增加 +10%｜緩速塔每級額外 +10% 緩速 緩速效果達到上限改為增加怪物承受傷害｜條件：`onlySlowTower`、`maxCount=3`
+- `knockback_up`｜攻擊爆炸擊退距離 +0.25｜砲擊塔爆炸命中時：擊退距離 +0.25，且每次擊退使該塔對該怪承傷 +10%（上限 +50%）｜條件：`onlyArtillery`
+- `knockback_stun`｜爆炸暈眩 +0.2秒｜砲擊塔爆炸附加 0.2 秒暈眩｜條件：`onlyArtillery`
+- `knockback_radius`｜爆炸範圍 +1｜砲擊塔爆炸範圍增加 1 格｜條件：`onlyArtillery`
+
+### B) 一般塔專精（`SPECIALIZATION_POOL`）
+- `spec_speed_aura`｜加速靈氣｜所有塔攻速 +10%｜條件：`speed >= 4`
+- `spec_fire_global`｜火之靈氣｜附近五格塔命中怪物附加灼傷效果（基礎持續3秒，擊中後刷新持續時間）｜條件：`fire_dmg >= 4`
+- `spec_water_global`｜水之靈氣｜附近五格塔命中怪物附加凍傷效果（基礎持續3秒，擊中後刷新持續時間）｜條件：`water_dmg >= 4`
+- `spec_wood_global`｜木專精｜附近五格塔命中怪物附加中毒效果（基礎持續5秒，擊中後刷新持續時間）｜條件：`wood_dmg >= 4`
+- `spec_crit_global`｜暴擊靈氣｜所有塔暴擊機率 +20%｜條件：`crit_chance >= 4`
+- `spec_crit_dmg_global`｜暴傷靈氣｜所有塔暴擊傷害 +20%｜條件：`crit_dmg >= 4`
+- `spec_chain_no_limit`｜連鎖彈射｜連鎖傷害不衰減，且可重複連鎖已命中目標｜條件：`proj_chain_up >= 3`
+- `spec_tower_speed_50`｜攻速提升 20%｜該塔攻速提升 20%
+- `spec_tower_base_100`｜基礎傷害提升 100%｜該塔基礎傷害 x2
+- `spec_tower_range_3`｜攻擊範圍 +3｜該塔攻擊範圍 +3 格
+- `spec_tower_share_exp`｜經驗外溢｜該塔擊殺經驗隨機分配給其他塔
+- `spec_tower_crit_random`｜隨機暴傷｜該塔暴擊額外 +10%~1000%
+- `spec_tower_stun_02`｜攻擊暈眩｜該塔每次攻擊暈眩 0.2 秒
+- `spec_tower_fire_explosion`｜火焰爆炸｜該塔命中觸發 50% 基礎火焰爆炸（3 格）
+- `spec_tower_attr_off_triple`｜基礎屬性強化｜屬性攻擊失效，基礎傷害 x3
+- `spec_tower_half_dmg_double_speed`｜高速連擊｜基礎傷害減半，攻速翻倍
+- `spec_tower_bleed`｜血蝕之刃｜流血傷害 +200%，流血持續時間改為 10 秒｜條件：`melee_bleed >= 3`
+- `spec_tower_poison`｜毒蝕蔓延｜所有塔中毒傷害 +200%、中毒持續至少 10 秒，並附加 15% 緩速｜條件：`poison_dmg >= 3`
+- `spec_tower_poison_frequency`｜劇毒高頻｜所有塔中毒頻率 +200%，並附加 15% 緩速｜條件：`poison_frequency >= 3`
+- `spec_global_wood_base`｜木源增幅｜全塔基礎傷害 +20% 木屬性傷害 +25%｜條件：`wood_dmg>=1 且 base_dmg>=1`
+- `spec_global_wood_crit_dmg`｜木源暴傷｜全塔暴擊傷害 +25% 木屬性暴擊傷害 +25%｜條件：`wood_dmg>=1 且 crit_dmg>=1`
+- `spec_global_water_base`｜水源增幅｜全塔基礎傷害 +20% 水屬性傷害 +25%｜條件：`water_dmg>=1 且 base_dmg>=1`
+- `spec_global_water_speed`｜水源急速｜全塔攻速 +12% 水屬性傷害 +25%｜條件：`water_dmg>=1 且 speed>=1`
+- `spec_global_fire_speed`｜炎源急速｜全塔攻速 +12% 火屬性傷害 +25%｜條件：`fire_dmg>=1 且 speed>=1`
+- `spec_global_fire_crit`｜炎源暴擊｜全塔暴擊率 +10% 火屬性傷害 +25%｜條件：`fire_dmg>=1 且 crit_chance>=1`
+- `spec_global_bleed_speed`｜血戰急速｜全塔攻速 +10% 木屬性傷害 +25%｜條件：`melee_bleed>=1 且 speed>=1`
+- `spec_global_bleed_base`｜血戰強襲｜全塔基礎傷害 +15% 木屬性傷害 +25%｜條件：`melee_bleed>=1 且 base_dmg>=1`
+- `spec_magic_wood_base`｜木法增幅｜該塔木屬性法術傷害 +100%｜條件：`elemental_wood_magic>=1 且 base_magic_dmg>=1`
+- `spec_magic_water_frost_trigger`｜寒脈共振｜該塔水屬性法術傷害 +100%｜條件：`elemental_water_magic>=1 且 magic_water_frostbite_talent>=1`
+- `spec_magic_fire_speed`｜炎術疾馳｜該塔火屬性法術傷害 +100%｜條件：`elemental_fire_magic>=1`
+- `spec_magic_combo_wood_fire`｜焚森術｜攻擊時機率觸發法術-焚森術(取代原本的龍捲風法術及炎暴法術)｜條件：`elemental_wood_magic>=1 且 elemental_fire_magic>=1`
+- `spec_magic_combo_fire_water`｜蒸潮術｜攻擊時機率觸發法術-蒸潮術(取代原本的炎暴法術及水球法術)｜條件：`elemental_fire_magic>=1 且 elemental_water_magic>=1`
+- `spec_magic_combo_water_wood`｜潮林術｜攻擊時機率觸發法術-潮林術(取代原本的水球法術及龍捲風法術)｜條件：`elemental_water_magic>=1 且 elemental_wood_magic>=1`
+- `spec_magic_dual_ailment`｜雙異常共鳴｜該塔造成的異常效果及異常傷害提升200%｜條件：`magic_water_frostbite_talent` `magic_wood_poison_talent` `magic_fire_scorch_talent`  任兩個都大於一等
+
+### C) 輔助塔三選一（`SUPPORT_UPGRADE_POOL`）
+- `support_attack_aura_up`｜強化攻擊靈氣效果｜攻擊靈氣效果每級 +15%｜條件：`requireAura=attack`
+- `support_speed_aura_up`｜強化速度靈氣效果｜速度靈氣效果每級 +15%｜條件：`requireAura=speed`
+- `support_slow_aura_up`｜強化緩速靈氣效果｜緩速靈氣效果每級 +15%｜條件：`requireAura=slow`
+- `support_crit_aura_up`｜強化暴擊靈氣效果｜暴擊靈氣效果每級 +15%｜條件：`requireAura=crit`
+- `support_spell_aura_up`｜強化法術靈氣效果｜法術靈氣每級 +20%（最高 5 級）｜條件：`requireAura=spell`、`maxCount=5`
+- `support_convert_speed_aura`｜轉換為速度靈氣｜將攻擊靈氣轉為速度靈氣（僅一次）｜條件：`requireAura=attack`、`isConvert`
+- `support_convert_slow_aura`｜轉換為緩速靈氣｜將攻擊靈氣轉為緩速靈氣（僅一次）｜條件：`requireAura=attack`、`isConvert`
+- `support_convert_crit_aura`｜轉換為暴擊靈氣｜將攻擊靈氣轉為暴擊靈氣（僅一次）｜條件：`requireAura=attack`、`isConvert`
+- `support_convert_spell_aura`｜轉換為法術靈氣｜將攻擊靈氣轉為法術靈氣（僅一次）｜條件：`requireAura=attack`、`isConvert`
+- `support_aura_range_up`｜範圍增加 1 格｜當前靈氣範圍 +1
+- `support_gain_level_book`｜獲得經驗之書 x1｜立即獲得 1 本經驗之書
+- `support_gain_speed_book`｜獲得速度之書 x1｜立即獲得 1 本速度之書
+- `support_gain_power_book`｜獲得力量之書 x1｜立即獲得 1 本力量之書
+- `support_gain_crit_book`｜獲得暴擊之書 x1｜立即獲得 1 本暴擊之書
+- `support_gain_gold_1000`｜獲得金幣 1000｜立即獲得 1000 金幣
+
+### D) 輔助塔專精（`SUPPORT_SPECIALIZATION_POOL`）
+- `support_spec_level_books_10`｜經驗之書 x5｜立即獲得 5 本經驗之書
+- `support_spec_speed_books_10`｜速度之書 x15｜立即獲得 15 本速度之書
+- `support_spec_power_books_10`｜力量之書 x15｜立即獲得 15 本力量之書
+- `support_spec_crit_books_10`｜暴擊傷害之書 x5｜立即獲得 5 本暴擊傷害之書
+- `support_spec_double_aura`｜靈氣效果翻倍｜當前塔的靈氣效果提升一倍
+- `support_spec_range_5`｜靈氣範圍 +5｜當前塔的靈氣範圍增加五格
+- `support_spec_lucky_aura`｜幸運靈氣｜附近塔暴擊傷害每秒隨機增加 0~2 倍
+- `support_spec_global_item_drop`｜尋寶指揮｜全域道具/裝備掉落機率 +15%（需書系升級總計 >=3）｜條件：`supportBookUpgradeCount >= 3`
+
+### E) 對齊結論（本次檢查）
+- `current-values.md` 舊段落（2.1.1 / 2.1.2 一帶）與遊戲內顯示文案「不完全一致」。
+- 本區塊已補齊「所有三選一 + 專精（含輔助塔）」的遊戲內原文，可直接作為調整清單。
+- 若後續改字，建議同步修改：`src/components/Game/Game.jsx` + 本檔此區塊。
