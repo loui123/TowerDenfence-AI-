@@ -938,11 +938,10 @@ const Game = ({ onExit }) => {
                             ctx.translate(proj.x * CELL_SIZE, proj.y * CELL_SIZE);
                             const dx = proj.lastKnownTargetX - proj.x;
                             const dy = proj.lastKnownTargetY - proj.y;
-                            ctx.rotate(Math.atan2(dy, dx) + Math.PI / 2);
+                            const wobble = Math.sin(Date.now() / 80 + proj.id * 10) * 0.3;
+                            ctx.rotate(Math.atan2(dy, dx) + Math.PI / 2 + wobble);
                             const w = CELL_SIZE * 0.4;
                             const h = CELL_SIZE * 0.4;
-                            // Add slight transparency fading out at the end of life if we had life,
-                            // but projectiles just exist until they hit. We can just draw them.
                             ctx.drawImage(img, -w / 2, -h / 2, w, h);
                             ctx.restore();
                             return;
@@ -954,7 +953,8 @@ const Game = ({ onExit }) => {
                             ctx.translate(proj.x * CELL_SIZE, proj.y * CELL_SIZE);
                             const dx = proj.lastKnownTargetX - proj.x;
                             const dy = proj.lastKnownTargetY - proj.y;
-                            ctx.rotate(Math.atan2(dy, dx) + Math.PI / 2);
+                            const wobble = Math.sin(Date.now() / 80 + proj.id * 10) * 0.2;
+                            ctx.rotate(Math.atan2(dy, dx) - Math.PI / 2 + wobble);
                             const w = CELL_SIZE * 0.4;
                             const h = CELL_SIZE * 0.4;
                             ctx.drawImage(img, -w / 2, -h / 2, w, h);
@@ -1069,7 +1069,7 @@ const Game = ({ onExit }) => {
 
                     const frameImg = images[`water_${frameNum}`];
                     if (frameImg && frameImg.complete && frameImg.naturalHeight > 0) {
-                        ctx.globalAlpha = alpha;
+                        ctx.globalAlpha = Math.min(0.75, alpha); // allow monster to be seen under ice
                         // Limit to slightly larger than monster but within grid size
                         const drawSize = CELL_SIZE * 1.2;
                         ctx.drawImage(frameImg, cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
@@ -1205,20 +1205,19 @@ const Game = ({ onExit }) => {
                     }
                 } else if (area.type === 'fusion_fire_water') {
                     const alpha = Math.max(0, area.life / 3);
-                    const pct = (performance.now() % 400) / 400;
-                    let frameNum = Math.min(3, Math.max(1, Math.ceil(pct * 3)));
+                    const flowScale = 1 + Math.sin(performance.now() / 300) * 0.05; // flowing magma feel
 
-                    const frameImg = images[`eruption_${frameNum}`];
+                    const frameImg = images['eruption_1'];
                     if (frameImg && frameImg.complete && frameImg.naturalHeight > 0) {
-                        ctx.globalAlpha = Math.min(1, alpha);
-                        const radius = 1.5 * CELL_SIZE;
+                        ctx.globalAlpha = Math.min(0.7, area.life / 1.5);
+                        const radius = 1.5 * CELL_SIZE * flowScale;
                         ctx.drawImage(frameImg, cx - radius, cy - radius, radius * 2, radius * 2);
                         ctx.globalAlpha = 1.0;
                     } else {
                         ctx.strokeStyle = `rgba(100, 200, 255, ${Math.min(1, alpha)})`;
                         ctx.lineWidth = 2;
                         ctx.beginPath();
-                        ctx.arc(cx, cy, 1.5 * CELL_SIZE, 0, Math.PI * 2);
+                        ctx.arc(cx, cy, 1.5 * CELL_SIZE * flowScale, 0, Math.PI * 2);
                         ctx.stroke();
                     }
                 }
