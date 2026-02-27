@@ -991,22 +991,20 @@ export class GameEngine {
                 } else if (magicElements.length === 1 && magicElements[0] === 'fire') {
                     this.addEffect(target.x + 0.5, target.y + 0.5, 'fire_burst', { life: 0.28, maxLife: 0.28 });
                 } else if (magicElements.length === 1 && magicElements[0] === 'water') {
-                    this.addEffect(target.x + 0.5, target.y + 0.5, 'water_burst', { life: 0.3, maxLife: 0.3 });
-                } else if (magicElements.length === 1 && magicElements[0] === 'wood') {
-                    this.addEffect(target.x + 0.5, target.y + 0.5, 'wood_burst', { life: 0.35, maxLife: 0.35 });
+                    this.addEffect(target.x + 0.5, target.y + 0.5, 'water_burst', { life: 0.28, maxLife: 0.28 });
                 } else {
                     this.addEffect(target.x + 0.5, target.y + 0.5, 'magic_burst', { life: 0.32, maxLife: 0.32 });
                 }
                 const isCrit = this.rollCritAgainstMob(rawCritChance, target);
                 const dealt = this.damageMob(target, damage, tower, isCrit);
-                this.applyOnHitEffects(target, tower, dealt);
+                this.applyOnHitEffects(target, tower, dealt, false); // isSubEffect = false for magic towers' normal attack
             });
         } else {
             targets.forEach((target) => {
                 this.addEffect(target.x + 0.5, target.y + 0.5, 'slash');
                 const isCrit = this.rollCritAgainstMob(rawCritChance, target);
                 const dealt = this.damageMob(target, damage, tower, isCrit);
-                this.applyOnHitEffects(target, tower, dealt);
+                this.applyOnHitEffects(target, tower, dealt, false); // isSubEffect = false for melee towers' normal attack
                 if (tower.type === 'melee' && (tower.additionalAttackCount || 0) > 0) {
                     const extraTimes = Math.max(0, tower.additionalAttackCount || 0);
                     for (let i = 0; i < extraTimes; i++) {
@@ -1044,10 +1042,13 @@ export class GameEngine {
 
             if (dist < 0.5) {
                 if (canHit) {
-                    this.addEffect(target.x + 0.5, target.y + 0.5, 'hit');
+                    let effectType = 'hit';
+                    if (p.isNatureFusion) effectType = 'leaf';
+                    if (p.sourceTower?.stats?.type === 'magic' && p.sourceTower?.stats?.element === 'water') effectType = 'water_drop';
+                    this.addEffect(target.x + 0.5, target.y + 0.5, effectType, { wobbling: true });
                     const isCrit = this.rollCritAgainstMob(p.rawCritChance || 0, target);
                     const dealt = this.damageMob(target, this.scaleDamage(p.damage, p.chainMultiplier || 1), p.sourceTower, isCrit);
-                    this.applyOnHitEffects(target, p.sourceTower, dealt);
+                    this.applyOnHitEffects(target, p.sourceTower, dealt, p.isNatureFusion); // p.isNatureFusion correctly indicates if it's a sub-effect
 
                     if (p.isNatureFusion) {
                         const randomAilment = Math.floor(Math.random() * 8);
@@ -2308,7 +2309,7 @@ export class GameEngine {
         return count;
     }
 
-    applyOnHitEffects(primaryTarget, sourceTower, hitDamage = 0) {
+    applyOnHitEffects(primaryTarget, sourceTower, hitDamage = 0, isSubEffect = false) {
         if (!primaryTarget || !sourceTower) return;
         const sourceBase = sourceTower.stats.damage;
         const resonance = this.getTowerResonanceEffects(sourceTower);
@@ -2382,7 +2383,9 @@ export class GameEngine {
             this.addPoisonStack(primaryTarget, sourceTower, perTick, duration, sourceTower.poisonFrequencyLevel || 0);
         }
 
-        this.applyMagicElementEffects(primaryTarget, sourceTower);
+        if (!isSubEffect) {
+            this.applyMagicElementEffects(primaryTarget, sourceTower);
+        }
         this.applyEquipmentOnHit(primaryTarget, sourceTower);
     }
 
