@@ -696,6 +696,8 @@ const Game = ({ onExit }) => {
             eruption_1: loadImg('/eruption_1.png'),
             eruption_2: loadImg('/eruption_2.png'),
             eruption_3: loadImg('/eruption_3.png'),
+            leaf: loadImg('/leaf.png'),
+            water_drop: loadImg('/water_drop.png'),
             bullet_arrow: loadImg('/bullet_arrow.png'),
             bullet_slow: loadImg('/bullet_slow.png'),
             bullet_aoe: loadImg('/bullet_aoe.png')
@@ -930,39 +932,35 @@ const Game = ({ onExit }) => {
 
                 if (proj.isNatureFusion) {
                     if (proj.visualType === 'leaf') {
-                        // Draw a leaf shape
-                        ctx.save();
-                        ctx.translate(proj.x * CELL_SIZE, proj.y * CELL_SIZE);
-                        const dx = proj.lastKnownTargetX - proj.x;
-                        const dy = proj.lastKnownTargetY - proj.y;
-                        ctx.rotate(Math.atan2(dy, dx));
-                        ctx.fillStyle = '#66cc66';
-                        ctx.beginPath();
-                        ctx.ellipse(0, 0, 7, 4, 0, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.strokeStyle = '#228822';
-                        ctx.lineWidth = 1;
-                        ctx.stroke();
-                        ctx.restore();
-                        return;
+                        const img = images['leaf'];
+                        if (img && img.complete && img.naturalHeight > 0) {
+                            ctx.save();
+                            ctx.translate(proj.x * CELL_SIZE, proj.y * CELL_SIZE);
+                            const dx = proj.lastKnownTargetX - proj.x;
+                            const dy = proj.lastKnownTargetY - proj.y;
+                            ctx.rotate(Math.atan2(dy, dx) + Math.PI / 2);
+                            const w = CELL_SIZE * 0.4;
+                            const h = CELL_SIZE * 0.4;
+                            // Add slight transparency fading out at the end of life if we had life,
+                            // but projectiles just exist until they hit. We can just draw them.
+                            ctx.drawImage(img, -w / 2, -h / 2, w, h);
+                            ctx.restore();
+                            return;
+                        }
                     } else if (proj.visualType === 'water_drop') {
-                        // Draw a water droplet
-                        ctx.save();
-                        ctx.translate(proj.x * CELL_SIZE, proj.y * CELL_SIZE);
-                        const dx = proj.lastKnownTargetX - proj.x;
-                        const dy = proj.lastKnownTargetY - proj.y;
-                        ctx.rotate(Math.atan2(dy, dx));
-                        ctx.fillStyle = '#66aaff';
-                        ctx.beginPath();
-                        ctx.moveTo(6, 0); // pointing towards target
-                        ctx.quadraticCurveTo(-4, 6, -4, 0);
-                        ctx.quadraticCurveTo(-4, -6, 6, 0);
-                        ctx.fill();
-                        ctx.strokeStyle = '#0055ff';
-                        ctx.lineWidth = 1;
-                        ctx.stroke();
-                        ctx.restore();
-                        return;
+                        const img = images['water_drop'];
+                        if (img && img.complete && img.naturalHeight > 0) {
+                            ctx.save();
+                            ctx.translate(proj.x * CELL_SIZE, proj.y * CELL_SIZE);
+                            const dx = proj.lastKnownTargetX - proj.x;
+                            const dy = proj.lastKnownTargetY - proj.y;
+                            ctx.rotate(Math.atan2(dy, dx) + Math.PI / 2);
+                            const w = CELL_SIZE * 0.4;
+                            const h = CELL_SIZE * 0.4;
+                            ctx.drawImage(img, -w / 2, -h / 2, w, h);
+                            ctx.restore();
+                            return;
+                        }
                     }
                 }
 

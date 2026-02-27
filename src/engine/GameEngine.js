@@ -146,6 +146,7 @@ export class GameEngine {
         if (id === 'poison_dmg_reduction') return { id, name: '中毒傷害減免', value: 0.5, desc: '承受中毒傷害減少 50%' };
         if (id === 'projectile_dmg_reduction') return { id, name: '投射物傷害減免', value: 0.3, desc: '承受投射物傷害減少 30%' };
         if (id === 'elemental_dmg_reduction') return { id, name: '元素傷害減免', value: 0.3, desc: '承受元素傷害減少 30%' };
+        if (id === 'magic_dmg_reduction') return { id, name: '法術傷害減免', value: 0.3, desc: '承受法術傷害減少 30%' };
         if (id === 'move_speed_up') {
             const progress = Math.max(0, Math.min(1, (wave - 10) / 50));
             const speedUp = 0.1 + ((0.6 - 0.1) * progress);
@@ -234,6 +235,7 @@ export class GameEngine {
             poison_dmg_reduction: 10,
             projectile_dmg_reduction: 10,
             elemental_dmg_reduction: 10,
+            magic_dmg_reduction: 10,
             move_speed_up: 30,
             hp_percent_up: 40,
             knockback_resist: 40,
@@ -1169,6 +1171,9 @@ export class GameEngine {
             if (tower?.stats?.type === 'projectile' && (mob.affixMap?.projectile_dmg_reduction || 0) > 0) {
                 finalVal *= (1 - mob.affixMap.projectile_dmg_reduction);
             }
+            if (tower?.stats?.type === 'magic' && (mob.affixMap?.magic_dmg_reduction || 0) > 0) {
+                finalVal *= (1 - mob.affixMap.magic_dmg_reduction);
+            }
             if ((typeId === 'fire' || typeId === 'water' || typeId === 'wood') && (mob.affixMap?.elemental_dmg_reduction || 0) > 0) {
                 finalVal *= (1 - mob.affixMap.elemental_dmg_reduction);
             }
@@ -2007,7 +2012,7 @@ export class GameEngine {
 
     getWaveHpScale(wave) {
         if (wave <= 10) return 1;
-        return Math.pow(1.1, wave - 10);
+        return Math.pow(1.15, wave - 10);
     }
 
     getWaveMobCountScale(wave) {
@@ -3264,8 +3269,8 @@ export class GameEngine {
             return;
         }
         if (sourceTower.specializationId === 'spec_magic_combo_water_wood' && magicElements.includes('water') && magicElements.includes('wood')) {
-            const numProjectiles = 6 + Math.floor(Math.random() * 4);
-            const baseDamage = (sourceTower.stats?.damage || 0) + (this.wave * 10);
+            const numProjectiles = 1 + Math.floor(Math.random() * 3);
+            const baseDamage = (sourceTower.stats?.damage || 0) + this.wave;
             for (let i = 0; i < numProjectiles; i++) {
                 const target = this.mobs[Math.floor(Math.random() * this.mobs.length)];
                 if (!target) continue;
