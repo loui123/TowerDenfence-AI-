@@ -18,7 +18,7 @@ export const TOWER_TYPES = {
     id: 'melee',
     name: '近戰塔',
     cost: 100,
-    stats: { damage: 15, range: 2, speed: 0.85, crit: 0.2, type: 'melee' },
+    stats: { damage: 15, range: 2, speed: 0.85, crit: 0.2, type: 'melee', aoe: true },
     color: '#8B4513'
   },
   PROJECTILE: {

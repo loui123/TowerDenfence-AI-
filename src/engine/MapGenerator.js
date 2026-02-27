@@ -11,15 +11,20 @@ export const generateMap = (width, height) => {
     const end = { x: width - 1, y: height - 1 };
 
     let validPath = null;
-    const maxAttempts = 500;
+    const maxAttempts = 1200;
+    const shortestLen = (width - 1) + (height - 1) + 1;
+    const minTargetLen = Math.floor(shortestLen * 1.35);
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         resetGridTypes(grid, start, end, width, height);
-        placeRandomObstacles(grid, start, end, width, height, 0.2);
+        // Slightly randomize obstacle density so path length and shape vary more.
+        const density = 0.18 + (Math.random() * 0.1);
+        placeRandomObstacles(grid, start, end, width, height, density);
 
         const path = findPath(grid, start, end, width, height);
         if (!path) continue;
         if (!hasUShape(path)) continue;
+        if (path.length < minTargetLen) continue;
 
         validPath = path;
         break;
@@ -214,7 +219,7 @@ const findPath = (grid, start, end, width, height) => {
 
         if (pos.x === end.x && pos.y === end.y) return path;
 
-        const dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+        const dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]].sort(() => Math.random() - 0.5);
         for (const [dx, dy] of dirs) {
             const nx = pos.x + dx;
             const ny = pos.y + dy;

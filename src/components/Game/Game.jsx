@@ -48,8 +48,9 @@ const UPGRADE_POOL = [
     { id: 'range', label: '攻擊距離 +1', desc: '提升攻擊範圍', maxCount: 4 },
     { id: 'proj_chain_up', label: '連鎖次數 +1', desc: '投射物額外連鎖一次', onlyProjectile: true, maxCount: 4 },
     { id: 'proj_count_up', label: '攻擊數量 +1', desc: '投射物額外命中目標 +1', onlyProjectile: true, maxCount: 2 },
-    { id: 'melee_bleed', label: '附加流血', desc: '近戰命中後 4 秒流血，每秒 30% 傷害（每級 +30%，不可疊加）', onlyMelee: true },
+    { id: 'melee_bleed', label: '附加流血', desc: '近戰命中後 4 秒流血，每秒 30% 傷害（每級 +30%，可疊加）', onlyMelee: true },
     { id: 'addition_attack', label: '額外攻擊 +1', desc: '命中時追加 50% 基礎傷害攻擊', onlyMelee: true, maxCount: 3 },
+    { id: 'melee_boss_dmg', label: '頭目殺手', desc: '對 Boss 造成的傷害加成 +50%', onlyMelee: true, maxCount: 3 },
     { id: 'slow_power_up', label: '緩速效果增加 +10%', desc: '緩速塔每級額外 +10% 緩速，緩速效果達到上限改為增加怪物承受傷害', onlySlowTower: true, maxCount: 3 },
     { id: 'knockback_up', label: '攻擊爆炸擊退距離 +0.25', desc: '砲擊塔爆炸命中時：擊退距離 +0.25，且每次擊退使該塔對該怪承傷 +10%（上限 +50%）', onlyArtillery: true },
     { id: 'knockback_stun', label: '爆炸暈眩 +0.2秒', desc: '砲擊塔爆炸附加 0.2 秒暈眩', onlyArtillery: true },
@@ -57,12 +58,12 @@ const UPGRADE_POOL = [
 ];
 
 const SPECIALIZATION_POOL = [
-    { id: 'spec_speed_aura', label: '加速靈氣', desc: '所有塔攻速 +10%', condition: (t) => (t.upgradeStats?.speed || 0) >= 4 },
+    { id: 'spec_speed_aura', label: '加速靈氣', desc: '所有塔攻速 +5%', condition: (t) => (t.upgradeStats?.speed || 0) >= 4 },
     { id: 'spec_fire_global', label: '火之靈氣', desc: '附近五格塔命中怪物附加灼傷效果（基礎持續3秒，擊中後刷新持續時間）', condition: (t) => (t.upgradeStats?.fire_dmg || 0) >= 4 },
     { id: 'spec_water_global', label: '水之靈氣', desc: '附近五格塔命中怪物附加凍傷效果（基礎持續3秒，擊中後刷新持續時間）', condition: (t) => (t.upgradeStats?.water_dmg || 0) >= 4 },
     { id: 'spec_wood_global', label: '木專精', desc: '附近五格塔命中怪物附加中毒效果（基礎持續5秒，擊中後刷新持續時間）', condition: (t) => (t.upgradeStats?.wood_dmg || 0) >= 4 },
-    { id: 'spec_crit_global', label: '暴擊靈氣', desc: '所有塔暴擊機率 +20%', condition: (t) => (t.upgradeStats?.crit_chance || 0) >= 4 },
-    { id: 'spec_crit_dmg_global', label: '暴傷靈氣', desc: '所有塔暴擊傷害 +20%', condition: (t) => (t.upgradeStats?.crit_dmg || 0) >= 4 },
+    { id: 'spec_crit_global', label: '暴擊靈氣', desc: '所有塔暴擊機率 +10%', condition: (t) => (t.upgradeStats?.crit_chance || 0) >= 4 },
+    { id: 'spec_crit_dmg_global', label: '暴傷靈氣', desc: '所有塔暴擊傷害 +10%', condition: (t) => (t.upgradeStats?.crit_dmg || 0) >= 4 },
     { id: 'spec_chain_no_limit', label: '連鎖彈射', desc: '連鎖傷害不衰減，且可重複連鎖已命中目標', condition: (t) => (t.upgradeStats?.proj_chain_up || 0) >= 3 },
     { id: 'spec_tower_speed_50', label: '攻速提升 20%', desc: '該塔攻速提升 20%' },
     { id: 'spec_tower_base_100', label: '基礎傷害提升 100%', desc: '該塔基礎傷害 x2' },
@@ -73,6 +74,7 @@ const SPECIALIZATION_POOL = [
     { id: 'spec_tower_fire_explosion', label: '火焰爆炸', desc: '該塔命中觸發 50% 基礎火焰爆炸（3 格）' },
     { id: 'spec_tower_attr_off_triple', label: '基礎屬性強化', desc: '屬性攻擊失效，基礎傷害 x3' },
     { id: 'spec_tower_half_dmg_double_speed', label: '高速連擊', desc: '基礎傷害減半，攻速翻倍' },
+    { id: 'spec_tower_boss_killer', label: '巨獸行刑者', desc: '對 Boss 造成的傷害追加 200%', condition: (t) => (t.upgradeStats?.melee_boss_dmg || 0) >= 3 },
     { id: 'spec_tower_bleed', label: '血蝕之刃', desc: '流血傷害 +200%，流血持續時間改為 10 秒', condition: (t) => (t.upgradeStats?.melee_bleed || 0) >= 3 },
     { id: 'spec_tower_poison', label: '毒蝕蔓延', desc: '所有塔中毒傷害 +200%、中毒持續至少 10 秒，並附加 15% 緩速', condition: (t) => (t.upgradeStats?.poison_dmg || 0) >= 3 },
     { id: 'spec_tower_poison_frequency', label: '劇毒高頻', desc: '所有塔中毒頻率 +200%，並附加 15% 緩速', condition: (t) => (t.upgradeStats?.poison_frequency || 0) >= 3 },
@@ -278,7 +280,7 @@ const CELL_TILE_MAP = {
     obstacle: '/tiles/cell_obstacle.svg'
 };
 const isMeleeTower = (tower) => tower?.type === 'melee';
-const isProjectileTower = (tower) => tower?.stats?.type === 'projectile';
+const isProjectileTower = (tower) => tower?.type === 'projectile';
 const isSlowTower = (tower) => tower?.type === 'projectile_slow';
 const isArtilleryTower = (tower) => tower?.type === 'projectile_aoe';
 const isMagicTower = (tower) => tower?.type === 'magic';
@@ -662,7 +664,41 @@ const Game = ({ onExit }) => {
             normal: loadImg('/monster_normal.png'),
             fire: loadImg('/monster_fire.png'),
             water: loadImg('/monster_water.png'),
-            wood: loadImg('/monster_wood.png')
+            wood: loadImg('/monster_wood.png'),
+            magic_tower: loadImg('/magic_tower.png'),
+            melee_tower: loadImg('/melee_tower.png'),
+            projectile_tower: loadImg('/projectile_tower.png'),
+            slow_tower: loadImg('/slow_tower.png'),
+            aoe_tower: loadImg('/aoe_tower.png'),
+            support_tower: loadImg('/support_tower.png'),
+            spell_1: loadImg('/spell_1.png'),
+            spell_2: loadImg('/spell_2.png'),
+            spell_3: loadImg('/spell_3.png'),
+            spell_4: loadImg('/spell_4.png'),
+            melee_hit_1: loadImg('/melee_hit_1.png'),
+            melee_hit_2: loadImg('/melee_hit_2.png'),
+            melee_hit_3: loadImg('/melee_hit_3.png'),
+            proj_hit_1: loadImg('/proj_hit_1.png'),
+            proj_hit_2: loadImg('/proj_hit_2.png'),
+            proj_hit_3: loadImg('/proj_hit_3.png'),
+            tornado_1: loadImg('/tornado_1.png'),
+            tornado_2: loadImg('/tornado_2.png'),
+            tornado_3: loadImg('/tornado_3.png'),
+            water_1: loadImg('/water_1.png'),
+            water_2: loadImg('/water_2.png'),
+            water_3: loadImg('/water_3.png'),
+            lightning_1: loadImg('/lightning_1.png'),
+            lightning_2: loadImg('/lightning_2.png'),
+            lightning_3: loadImg('/lightning_3.png'),
+            fire_vortex_1: loadImg('/fire_vortex_1.png'),
+            fire_vortex_2: loadImg('/fire_vortex_2.png'),
+            fire_vortex_3: loadImg('/fire_vortex_3.png'),
+            eruption_1: loadImg('/eruption_1.png'),
+            eruption_2: loadImg('/eruption_2.png'),
+            eruption_3: loadImg('/eruption_3.png'),
+            bullet_arrow: loadImg('/bullet_arrow.png'),
+            bullet_slow: loadImg('/bullet_slow.png'),
+            bullet_aoe: loadImg('/bullet_aoe.png')
         };
     }, []);
 
@@ -865,11 +901,71 @@ const Game = ({ onExit }) => {
             });
 
             eng.projectiles.forEach((proj) => {
+                const type = proj.sourceTower?.type;
+                let bulletImg = null;
+
+                if (type === 'projectile') bulletImg = images.bullet_arrow;
+                else if (type === 'projectile_slow') bulletImg = images.bullet_slow;
+                else if (type === 'projectile_aoe') bulletImg = images.bullet_aoe;
+
+                if (bulletImg && bulletImg.complete && bulletImg.naturalHeight > 0) {
+                    const dx = proj.lastKnownTargetX - proj.x;
+                    const dy = proj.lastKnownTargetY - proj.y;
+                    const angle = Math.atan2(dy, dx);
+
+                    ctx.save();
+                    ctx.translate(proj.x * CELL_SIZE, proj.y * CELL_SIZE);
+                    ctx.rotate(angle);
+                    const w = CELL_SIZE * 0.8;
+                    const h = CELL_SIZE * 0.8;
+                    ctx.drawImage(bulletImg, -w / 2, -h / 2, w, h);
+                    ctx.restore();
+                    return;
+                }
+
                 let projectileColor = '#ffd54a';
-                if (proj.sourceTower?.type === 'projectile_slow') projectileColor = '#66b8ff';
-                if (proj.sourceTower?.type === 'projectile') projectileColor = '#ffd54a';
-                if (proj.sourceTower?.type === 'projectile_aoe') projectileColor = '#ff4d4d';
-                if (proj.sourceTower?.type === 'magic') projectileColor = '#b67bff';
+                if (type === 'projectile_slow') projectileColor = '#66b8ff';
+                if (type === 'projectile_aoe') projectileColor = '#ff4d4d';
+                if (type === 'magic') projectileColor = '#b67bff';
+
+                if (proj.isNatureFusion) {
+                    if (proj.visualType === 'leaf') {
+                        // Draw a leaf shape
+                        ctx.save();
+                        ctx.translate(proj.x * CELL_SIZE, proj.y * CELL_SIZE);
+                        const dx = proj.lastKnownTargetX - proj.x;
+                        const dy = proj.lastKnownTargetY - proj.y;
+                        ctx.rotate(Math.atan2(dy, dx));
+                        ctx.fillStyle = '#66cc66';
+                        ctx.beginPath();
+                        ctx.ellipse(0, 0, 7, 4, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.strokeStyle = '#228822';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        ctx.restore();
+                        return;
+                    } else if (proj.visualType === 'water_drop') {
+                        // Draw a water droplet
+                        ctx.save();
+                        ctx.translate(proj.x * CELL_SIZE, proj.y * CELL_SIZE);
+                        const dx = proj.lastKnownTargetX - proj.x;
+                        const dy = proj.lastKnownTargetY - proj.y;
+                        ctx.rotate(Math.atan2(dy, dx));
+                        ctx.fillStyle = '#66aaff';
+                        ctx.beginPath();
+                        ctx.moveTo(6, 0); // pointing towards target
+                        ctx.quadraticCurveTo(-4, 6, -4, 0);
+                        ctx.quadraticCurveTo(-4, -6, 6, 0);
+                        ctx.fill();
+                        ctx.strokeStyle = '#0055ff';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        ctx.restore();
+                        return;
+                    }
+                }
+
                 ctx.fillStyle = projectileColor;
                 ctx.beginPath();
                 ctx.arc(proj.x * CELL_SIZE, proj.y * CELL_SIZE, 4, 0, Math.PI * 2);
@@ -881,13 +977,31 @@ const Game = ({ onExit }) => {
                 const cy = eff.y * CELL_SIZE;
 
                 if (eff.type === 'slash') {
-                    ctx.strokeStyle = `rgba(255, 255, 255, ${eff.life / 0.3})`;
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    const startAngle = eff.angle - Math.PI / 4;
-                    const endAngle = eff.angle + Math.PI / 4;
-                    ctx.arc(cx, cy, 20, startAngle, endAngle);
-                    ctx.stroke();
+                    const pct = Math.max(0, 1 - (eff.life / 0.3));
+                    let frameNum = 1;
+                    if (pct > 0.66) frameNum = 3;
+                    else if (pct > 0.33) frameNum = 2;
+                    const frameImg = images[`melee_hit_${frameNum}`];
+
+                    if (frameImg && frameImg.complete && frameImg.naturalHeight > 0) {
+                        ctx.save();
+                        ctx.translate(cx, cy);
+                        if (eff.angle !== undefined) {
+                            ctx.rotate(eff.angle);
+                        }
+                        const r = CELL_SIZE * 0.8;
+                        ctx.globalAlpha = eff.life / 0.3;
+                        ctx.drawImage(frameImg, -r / 2, -r / 2, r, r);
+                        ctx.restore();
+                    } else {
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${eff.life / 0.3})`;
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        const startAngle = (eff.angle || 0) - Math.PI / 4;
+                        const endAngle = (eff.angle || 0) + Math.PI / 4;
+                        ctx.arc(cx, cy, 20, startAngle, endAngle);
+                        ctx.stroke();
+                    }
                 } else if (eff.type === 'hit') {
                     ctx.fillStyle = `rgba(255, 255, 0, ${eff.life / 0.3})`;
                     ctx.beginPath();
@@ -931,18 +1045,44 @@ const Game = ({ onExit }) => {
                     ctx.stroke();
                 } else if (eff.type === 'fire_spell') {
                     const alpha = Math.max(0, eff.life / (eff.maxLife || 0.35));
-                    ctx.strokeStyle = `rgba(255, 120, 80, ${alpha})`;
-                    ctx.lineWidth = 2.2;
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, ((eff.radius || 2) * CELL_SIZE * 0.35) + (1 - alpha) * 10, 0, Math.PI * 2);
-                    ctx.stroke();
+
+                    const pct = Math.max(0, 1 - (eff.life / (eff.maxLife || 0.35)));
+                    let frameNum = 1;
+                    if (pct > 0.75) frameNum = 4;
+                    else if (pct > 0.5) frameNum = 3;
+                    else if (pct > 0.25) frameNum = 2;
+
+                    const frameImg = images[`spell_${frameNum}`];
+                    if (frameImg && frameImg.complete && frameImg.naturalHeight > 0) {
+                        ctx.globalAlpha = alpha;
+                        ctx.drawImage(frameImg, cx - CELL_SIZE / 2, cy - CELL_SIZE / 2, CELL_SIZE, CELL_SIZE);
+                        ctx.globalAlpha = 1.0;
+                    } else {
+                        ctx.strokeStyle = `rgba(255, 120, 80, ${alpha})`;
+                        ctx.lineWidth = 2.2;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, ((eff.radius || 2) * CELL_SIZE * 0.35) + (1 - alpha) * 10, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
                 } else if (eff.type === 'water_spell') {
                     const alpha = Math.max(0, eff.life / (eff.maxLife || 0.35));
-                    ctx.strokeStyle = `rgba(120, 190, 255, ${alpha})`;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, ((eff.radius || 2) * CELL_SIZE * 0.3) + (1 - alpha) * 12, 0, Math.PI * 2);
-                    ctx.stroke();
+                    const pct = Math.max(0, 1 - (eff.life / (eff.maxLife || 0.35)));
+                    let frameNum = Math.min(3, Math.max(1, Math.ceil(pct * 3)));
+
+                    const frameImg = images[`water_${frameNum}`];
+                    if (frameImg && frameImg.complete && frameImg.naturalHeight > 0) {
+                        ctx.globalAlpha = alpha;
+                        // Limit to slightly larger than monster but within grid size
+                        const drawSize = CELL_SIZE * 1.2;
+                        ctx.drawImage(frameImg, cx - drawSize / 2, cy - drawSize / 2, drawSize, drawSize);
+                        ctx.globalAlpha = 1.0;
+                    } else {
+                        ctx.strokeStyle = `rgba(120, 190, 255, ${alpha})`;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, ((eff.radius || 2) * CELL_SIZE * 0.3) + (1 - alpha) * 12, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
                 } else if (eff.type === 'fire_aura_proc') {
                     const alpha = Math.max(0, eff.life / (eff.maxLife || 0.3));
                     const r = ((eff.radius || 2) * CELL_SIZE * 0.28) + (1 - alpha) * 10;
@@ -967,42 +1107,123 @@ const Game = ({ onExit }) => {
                     ctx.stroke();
                 } else if (eff.type === 'lightning_strike') {
                     const alpha = Math.max(0, eff.life / (eff.maxLife || 0.16));
-                    ctx.strokeStyle = `rgba(150, 230, 255, ${alpha})`;
-                    ctx.lineWidth = 2.2;
-                    ctx.beginPath();
-                    ctx.moveTo(cx - 3, cy - 12);
-                    ctx.lineTo(cx + 2, cy - 5);
-                    ctx.lineTo(cx - 1, cy - 1);
-                    ctx.lineTo(cx + 4, cy + 6);
-                    ctx.stroke();
+                    const pct = Math.max(0, 1 - (eff.life / (eff.maxLife || 0.16)));
+                    let frameNum = Math.min(3, Math.max(1, Math.ceil(pct * 3)));
+
+                    const frameImg = images[`lightning_${frameNum}`];
+                    if (frameImg && frameImg.complete && frameImg.naturalHeight > 0) {
+                        ctx.globalAlpha = alpha;
+                        const w = CELL_SIZE;
+                        const h = CELL_SIZE * 3;
+                        ctx.drawImage(frameImg, cx - w / 2, cy - h / 2 - CELL_SIZE, w, h);
+                        ctx.globalAlpha = 1.0;
+                    } else {
+                        ctx.strokeStyle = `rgba(150, 230, 255, ${alpha})`;
+                        ctx.lineWidth = 2.2;
+                        ctx.beginPath();
+                        ctx.moveTo(cx - 3, cy - 12);
+                        ctx.lineTo(cx + 2, cy - 5);
+                        ctx.lineTo(cx - 1, cy - 1);
+                        ctx.lineTo(cx + 4, cy + 6);
+                        ctx.stroke();
+                    }
                 } else if (eff.type === 'chain_arc') {
                     const alpha = Math.max(0, eff.life / (eff.maxLife || 0.12));
+                    const pct = Math.max(0, 1 - (eff.life / (eff.maxLife || 0.12)));
+                    let frameNum = Math.min(3, Math.max(1, Math.ceil(pct * 3)));
+
                     const fromX = (eff.fromX ?? eff.x) * CELL_SIZE;
                     const fromY = (eff.fromY ?? eff.y) * CELL_SIZE;
                     const toX = (eff.toX ?? eff.x) * CELL_SIZE;
                     const toY = (eff.toY ?? eff.y) * CELL_SIZE;
-                    ctx.strokeStyle = `rgba(140, 220, 255, ${alpha})`;
-                    ctx.lineWidth = 1.8;
-                    const midX = (fromX + toX) * 0.5 + ((Math.random() - 0.5) * 12);
-                    const midY = (fromY + toY) * 0.5 + ((Math.random() - 0.5) * 12);
-                    ctx.beginPath();
-                    ctx.moveTo(fromX, fromY);
-                    ctx.lineTo(midX, midY);
-                    ctx.lineTo(toX, toY);
-                    ctx.stroke();
+
+                    const frameImg = images[`lightning_${frameNum}`];
+                    if (frameImg && frameImg.complete && frameImg.naturalHeight > 0) {
+                        const dx = toX - fromX;
+                        const dy = toY - fromY;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const angle = Math.atan2(dy, dx);
+
+                        ctx.save();
+                        ctx.globalAlpha = alpha;
+                        ctx.translate(fromX, fromY);
+                        ctx.rotate(angle - Math.PI / 2);
+                        const width = CELL_SIZE / 1.5;
+                        ctx.drawImage(frameImg, -width / 2, 0, width, dist);
+                        ctx.restore();
+                    } else {
+                        ctx.strokeStyle = `rgba(140, 220, 255, ${alpha})`;
+                        ctx.lineWidth = 1.8;
+                        const midX = (fromX + toX) * 0.5 + ((Math.random() - 0.5) * 12);
+                        const midY = (fromY + toY) * 0.5 + ((Math.random() - 0.5) * 12);
+                        ctx.beginPath();
+                        ctx.moveTo(fromX, fromY);
+                        ctx.lineTo(midX, midY);
+                        ctx.lineTo(toX, toY);
+                        ctx.stroke();
+                    }
                 }
             });
 
             eng.areaEffects?.forEach((area) => {
-                if (area.type !== 'tornado') return;
                 const cx = area.x * CELL_SIZE;
                 const cy = area.y * CELL_SIZE;
-                const alpha = Math.max(0, area.life / 3);
-                ctx.strokeStyle = `rgba(120, 220, 140, ${Math.min(1, alpha)})`;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(cx, cy, area.radius * CELL_SIZE, 0, Math.PI * 2);
-                ctx.stroke();
+
+                if (area.type === 'tornado') {
+                    const alpha = Math.max(0, area.life / 3);
+                    const pct = (performance.now() % 300) / 300;
+                    let frameNum = Math.min(3, Math.max(1, Math.ceil(pct * 3)));
+
+                    const frameImg = images[`tornado_${frameNum}`];
+                    if (frameImg && frameImg.complete && frameImg.naturalHeight > 0) {
+                        ctx.globalAlpha = Math.min(1, alpha);
+                        const radius = area.radius * CELL_SIZE;
+                        ctx.drawImage(frameImg, cx - radius, cy - radius, radius * 2, radius * 2);
+                        ctx.globalAlpha = 1.0;
+                    } else {
+                        ctx.strokeStyle = `rgba(120, 220, 140, ${Math.min(1, alpha)})`;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, area.radius * CELL_SIZE, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                } else if (area.type === 'fusion_fire_wood') {
+                    const alpha = Math.max(0, area.life / 3);
+                    const pct = (performance.now() % 300) / 300;
+                    let frameNum = Math.min(3, Math.max(1, Math.ceil(pct * 3)));
+
+                    const frameImg = images[`fire_vortex_${frameNum}`];
+                    if (frameImg && frameImg.complete && frameImg.naturalHeight > 0) {
+                        ctx.globalAlpha = Math.min(1, alpha);
+                        const radius = 1.5 * CELL_SIZE;
+                        ctx.drawImage(frameImg, cx - radius, cy - radius, radius * 2, radius * 2);
+                        ctx.globalAlpha = 1.0;
+                    } else {
+                        ctx.strokeStyle = `rgba(255, 100, 50, ${Math.min(1, alpha)})`;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, 1.5 * CELL_SIZE, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                } else if (area.type === 'fusion_fire_water') {
+                    const alpha = Math.max(0, area.life / 3);
+                    const pct = (performance.now() % 400) / 400;
+                    let frameNum = Math.min(3, Math.max(1, Math.ceil(pct * 3)));
+
+                    const frameImg = images[`eruption_${frameNum}`];
+                    if (frameImg && frameImg.complete && frameImg.naturalHeight > 0) {
+                        ctx.globalAlpha = Math.min(1, alpha);
+                        const radius = 1.5 * CELL_SIZE;
+                        ctx.drawImage(frameImg, cx - radius, cy - radius, radius * 2, radius * 2);
+                        ctx.globalAlpha = 1.0;
+                    } else {
+                        ctx.strokeStyle = `rgba(100, 200, 255, ${Math.min(1, alpha)})`;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, 1.5 * CELL_SIZE, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                }
             });
 
             ctx.font = 'bold 14px "Segoe UI", Arial';
@@ -1201,6 +1422,7 @@ const Game = ({ onExit }) => {
                 if (id === 'spec_tower_stun_02') p += 45;
                 if (id === 'spec_speed_aura') p += 35;
                 if (id === 'spec_tower_half_dmg_double_speed') p += 25;
+                if (id === 'spec_tower_boss_killer') p += 50;
             }
 
             if (category === 'slow') {
@@ -1473,7 +1695,7 @@ const Game = ({ onExit }) => {
         const currentCrit = (selectedTower.stats?.crit || 0) * 100;
         const extraCrit = currentCrit - initialCrit;
 
-        const currentCritDmg = selectedTower.stats?.critDmg || INITIAL_CRIT_DMG;
+        const currentCritDmg = (selectedTower.stats?.critDmg || INITIAL_CRIT_DMG) + (selectedTower.stats?.critDmgBookBonus || 0);
         const extraCritDmg = currentCritDmg - INITIAL_CRIT_DMG;
 
         const initialSpeed = displayBaseSpeed * talentSpeedMult;
@@ -1772,7 +1994,7 @@ const Game = ({ onExit }) => {
                                     {selectedTowerDetail.equipmentName && <div>裝備: {selectedTowerDetail.equipmentName}</div>}
                                     <div>傷害: {Math.floor(selectedTowerDetail.initialDamage)} + {Math.floor(selectedTowerDetail.bonusBaseDamage)} + <span style={{ color: '#ff7373' }}>火 {Math.floor(selectedTowerDetail.extraFire)}</span> / <span style={{ color: '#7fb7ff' }}>水 {Math.floor(selectedTowerDetail.extraWater)}</span> / <span style={{ color: '#8ddc8d' }}>木 {Math.floor(selectedTowerDetail.extraWood)}</span></div>
                                     <div>暴擊率: {selectedTowerDetail.initialCrit.toFixed(0)}% + ({selectedTowerDetail.extraCrit >= 0 ? '+' : ''}{selectedTowerDetail.extraCrit.toFixed(0)}%)</div>
-                                    <div>暴擊傷害: {INITIAL_CRIT_DMG.toFixed(2)} + ({selectedTowerDetail.extraCritDmg >= 0 ? '+' : ''}{selectedTowerDetail.extraCritDmg.toFixed(2)})</div>
+                                    <div>暴擊傷害: {((INITIAL_CRIT_DMG - 1) * 100).toFixed(0)}% + ({selectedTowerDetail.extraCritDmg >= 0 ? '+' : ''}{(selectedTowerDetail.extraCritDmg * 100).toFixed(0)}%)</div>
                                     <div>攻速: {selectedTowerDetail.initialSpeed.toFixed(2)} + ({selectedTowerDetail.extraSpeed >= 0 ? '+' : ''}{selectedTowerDetail.extraSpeed.toFixed(2)})</div>
                                     <div>距離: {selectedTowerDetail.initialRange.toFixed(1)} + ({selectedTowerDetail.extraRange >= 0 ? '+' : ''}{selectedTowerDetail.extraRange.toFixed(1)})</div>
                                     {!isSupportTower(selectedTower) && (
@@ -1868,414 +2090,438 @@ const Game = ({ onExit }) => {
 
                 <div style={{ width: scaledMapSize, margin: '0 auto', flex: '0 0 auto', order: isMobile ? 1 : 2 }}>
                     <div style={{ position: 'relative', width: scaledMapSize, height: scaledMapSize }}>
-                    <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: baseMapSize,
-                        height: baseMapSize,
-                        transform: `scale(${mapScale})`,
-                        transformOrigin: 'top left'
-                    }}>
-                    <div style={{
-                        position: 'absolute', top: 0, left: 0,
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(15, ${CELL_SIZE}px)`,
-                        gridTemplateRows: `repeat(15, ${CELL_SIZE}px)`
-                    }}>
-                        {grid.map((row, y) => row.map((cell, x) => {
-                            const tower = cell.type === 'tower' && engineRef.current
-                                ? engineRef.current.getTowerAt(x, y)
-                                : null;
-                            const cellTexture = getCellTexture(cell);
-                            const pendingUpgrades = tower ? (tower.pendingUpgrades || 0) : 0;
-                            const pendingSpecs = tower?.pendingSpecialization ? 1 : 0;
-                            const pending = pendingUpgrades + pendingSpecs;
-                            const isReady = pending > 0;
-                            const hasEquipment = !!tower?.equipmentId || !!tower?.equipmentName;
-
-                            return (
-                                <div
-                                    key={`${x}-${y}`}
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => handleCellClick(x, y)}
-                                    style={{
-                                        width: CELL_SIZE,
-                                        height: CELL_SIZE,
-                                        backgroundColor: getCellColor(cell),
-                                        backgroundImage: cellTexture
-                                            ? (
-                                                cell.type === 'build'
-                                                    ? `linear-gradient(rgba(16,16,16,0.36), rgba(16,16,16,0.36)), url(${cellTexture})`
-                                                    : `url(${cellTexture})`
-                                            )
-                                            : 'none',
-                                        backgroundSize: 'cover',
-                                        backgroundBlendMode: 'normal',
-                                        opacity: cell.type === 'build' ? 0.72 : 1,
-                                        filter: cell.type === 'build' ? 'saturate(0.58) brightness(0.9)' : 'none',
-                                        border: '1px solid #333',
-                                        cursor: (cell.type === 'build' || (cell.type === 'tower' && (isReady || !!selectedInventoryItem))) ? 'pointer' : 'default',
-                                        position: 'relative',
-                                        userSelect: 'none',
-                                        WebkitUserSelect: 'none',
-                                        animation: isReady ? 'tower-ready-blink 1.1s infinite' : 'none',
-                                        boxShadow: (cell.type === 'tower' && selectedInventoryItem)
-                                            ? 'inset 0 0 0 2px rgba(126, 213, 255, 0.55)'
-                                            : 'none'
-                                    }}
-                                >
-                                    {cell.type === 'tower' && (
-                                        <div style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            background: getTowerLevelColor(tower?.level || 1),
-                                            borderRadius: '4px',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontWeight: 700,
-                                            fontSize: '14px',
-                                            color: '#111',
-                                            border: `1px solid ${getTowerColor(cell.towerType)}`
-                                        }}>
-                                            {getTowerLabel(cell.towerType)}
-                                        </div>
-                                    )}
-
-                                    {isReady && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: 1,
-                                            right: hasEquipment ? 20 : 1,
-                                            minWidth: 16,
-                                            height: 16,
-                                            borderRadius: 999,
-                                            background: '#7cff9a',
-                                            color: '#0d3318',
-                                            fontSize: 11,
-                                            fontWeight: 800,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            padding: '0 4px'
-                                        }}>
-                                            {pending}
-                                        </div>
-                                    )}
-                                    {hasEquipment && (
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: 1,
-                                            right: 1,
-                                            width: 16,
-                                            height: 16,
-                                            borderRadius: 3,
-                                            background: '#4fa6ff',
-                                            color: '#eaf4ff',
-                                            fontSize: 11,
-                                            fontWeight: 800,
-                                            lineHeight: '16px',
-                                            textAlign: 'center',
-                                            boxShadow: '0 0 0 1px rgba(12, 35, 64, 0.7)'
-                                        }}>
-                                            E
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        }))}
-                    </div>
-
-                    <canvas
-                        ref={canvasRef}
-                        width={600}
-                        height={600}
-                        style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
-                    />
-
-                    {gameOver && (
                         <div style={{
                             position: 'absolute',
                             top: 0,
                             left: 0,
-                            right: 0,
-                            bottom: 0,
-                            background: 'rgba(0,0,0,0.8)',
-                            color: 'white',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            zIndex: 30,
-                            gap: '10px'
+                            width: baseMapSize,
+                            height: baseMapSize,
+                            transform: `scale(${mapScale})`,
+                            transformOrigin: 'top left'
                         }}>
-                            <h1>遊戲結束</h1>
-                            <button onClick={handleExitWithRecord}>回主選單</button>
-                        </div>
-                    )}
-
-                    {buildTarget && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '24px',
-                            left: '24px',
-                            right: '24px',
-                            bottom: '24px',
-                            background: '#222',
-                            border: '2px solid #66ccff',
-                            padding: '14px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '8px',
-                            overflow: 'hidden',
-                            zIndex: 20
-                        }}>
-                            <h3>選擇要建造的塔</h3>
-                            <div style={{ color: '#cde8ff', textAlign: 'left' }}>
-                                地形: {getTerrainLabel(buildCell?.terrain)} | 效果: {getTerrainEffectText(buildCell?.terrain)}
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoRows: '1fr', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '2px' }}>
-                                {Object.values(TOWER_TYPES).map((type) => (
-                                    <button
-                                        key={type.id}
-                                        onClick={() => handleBuildTower(type.id)}
-                                        style={{
-                                            background: '#2f2f2f',
-                                            border: `2px solid ${type.color}`,
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '4px',
-                                            alignItems: 'flex-start',
-                                            textAlign: 'left',
-                                            justifyContent: 'flex-start',
-                                            padding: '8px',
-                                            fontSize: '0.78rem',
-                                            lineHeight: 1.2
-                                        }}
-                                    >
-                                    <div style={{ fontWeight: 700 }}>{getTowerLabel(type.id)} 塔</div>
-                                        {getBuildPanelLines(type).map((line, idx) => (
-                                            <div key={`${type.id}-line-${idx}`} style={{ color: idx === 0 ? '#ffffff' : '#cfd6df' }}>
-                                                {line}
-                                            </div>
-                                        ))}
-                                    </button>
-                                ))}
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '2px' }}>
-                                <button onClick={() => setBuildTarget(null)}>取消</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {upgradeTarget && upgradeTower && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '60px',
-                            left: '50px',
-                            right: '50px',
-                            bottom: '60px',
-                            background: '#222',
-                            border: '2px solid #5eff7a',
-                            padding: '20px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '10px',
-                            zIndex: 25
-                        }}>
-                            <h3>
-                                {towerPanelMode === 'specialization'
-                                    ? '塔專精三選一'
-                                    : `塔升級選擇（剩餘 ${upgradeTower.pendingUpgrades || 0} 次）`}
-                            </h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', textAlign: 'left', fontSize: '0.9rem', color: '#d6d6d6' }}>
-                                <div>地形: {getTerrainLabel(upgradeCell?.terrain)}</div>
-                                <div>地形效果: {getTerrainEffectText(upgradeCell?.terrain)}</div>
-                                <div>塔等級: {upgradeTower.level}</div>
-                                {isSupportTower(upgradeTower) ? (
-                                    <>
-                                        <div>輔助經驗: {upgradeTower.supportExp || 0}/15</div>
-                                        <div>靈氣型態: {upgradeTower.supportAuraType || 'attack'}</div>
-                                        <div>靈氣範圍: {(1 + (upgradeTower.supportAuraRangeBonus || 0)).toFixed(1)}</div>
-                                        <div>靈氣效果: +{(upgradeSupportAuraStatus?.effectPct || 0).toFixed(0)}%</div>
-                                        <div>影響塔數: {upgradeSupportAuraStatus?.affectedTowerCount || 0}</div>
-                                        <div>幸運靈氣: {upgradeTower.supportLuckyAura ? `+${(upgradeTower.supportLuckyCritDmgBonus || 0).toFixed(2)} 暴傷` : '未啟用'}</div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div>擊殺計數: {upgradeTower.kills}/10</div>
-                                        <div>基礎傷害: {Math.floor(upgradeTower.stats.damage)}</div>
-                                        <div>攻速: {upgradeTower.stats.speed.toFixed(2)}</div>
-                                        <div>暴擊率: {(upgradeTower.stats.crit * 100).toFixed(0)}%</div>
-                                        <div>攻擊距離: {upgradeTower.stats.range.toFixed(1)}</div>
-                                        <div>靈氣傷害加成: +{(upgradeAuraSnapshot?.damagePct || 0).toFixed(0)}%</div>
-                                        <div>靈氣攻速加成: +{(upgradeAuraSnapshot?.speedPct || 0).toFixed(0)}%</div>
-                                        <div>靈氣暴擊加成: +{(upgradeAuraSnapshot?.critChancePct || 0).toFixed(0)}%</div>
-                                        <div>靈氣暴傷加成: +{(upgradeAuraSnapshot?.critDmgBonus || 0).toFixed(2)}</div>
-                                    </>
-                                )}
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', flex: 1 }}>
-                                {upgradeOptions.map((opt) => (
-                                    <button
-                                        key={opt.id}
-                                        onClick={() => handleUpgradeSelect(opt.id)}
-                                        style={{ background: '#333', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}
-                                    >
-                                        <div style={{ fontWeight: 'bold', color: '#7cff9a' }}>{opt.label}</div>
-                                        <div style={{ fontSize: '0.82rem', color: '#ccc' }}>{opt.desc}</div>
-                                    </button>
-                                ))}
-                            </div>
-                            <div style={{ alignSelf: 'flex-end', display: 'flex', gap: '8px' }}>
-                                {towerPanelMode === 'upgrade' && (
-                                    <button onClick={handleUpgradeReroll}>
-                                        重骰（{(upgradeTower.level || 1) * 20} 金幣）
-                                    </button>
-                                )}
-                                <button onClick={closeUpgradePanel}>暫緩</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-                </div>
-
-                <div style={{
-                    width: centerInventoryWidth,
-                    border: '2px solid #ddd',
-                    background: 'rgba(0,0,0,0.35)',
-                    padding: '10px',
-                    display: isMobile ? 'none' : 'grid',
-                    gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr',
-                    gap: '10px',
-                    margin: '10px auto 0'
-                }}>
-                    <div style={{
-                        border: '1px solid #444',
-                        background: 'rgba(0,0,0,0.28)',
-                        padding: '8px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px'
-                    }}>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <button
-                                onClick={() => setInventoryTab(ITEM_TYPES.CONSUMABLE)}
-                                style={{
-                                    border: inventoryTab === ITEM_TYPES.CONSUMABLE ? '1px solid #7cff9a' : '1px solid #555',
-                                    background: inventoryTab === ITEM_TYPES.CONSUMABLE ? '#1f3a25' : '#1f1f1f',
-                                    color: '#ddd',
-                                    padding: '4px 8px',
-                                    fontSize: '0.8rem'
-                                }}
-                            >
-                                道具 {inventoryByType[ITEM_TYPES.CONSUMABLE].length > 0 ? `(${inventoryByType[ITEM_TYPES.CONSUMABLE].length})` : ''}
-                            </button>
-                            <button
-                                onClick={() => setInventoryTab(ITEM_TYPES.EQUIPMENT)}
-                                style={{
-                                    border: inventoryTab === ITEM_TYPES.EQUIPMENT ? '1px solid #7cff9a' : '1px solid #555',
-                                    background: inventoryTab === ITEM_TYPES.EQUIPMENT ? '#1f2d3a' : '#1f1f1f',
-                                    color: '#ddd',
-                                    padding: '4px 8px',
-                                    fontSize: '0.8rem'
-                                }}
-                            >
-                                裝備 {inventoryByType[ITEM_TYPES.EQUIPMENT].length > 0 ? `(${inventoryByType[ITEM_TYPES.EQUIPMENT].length})` : ''}
-                            </button>
-                            <div style={{ marginLeft: 'auto', color: '#89a7bf', fontSize: '0.78rem' }}>
-                                第 {activeInventoryPage + 1}/{totalInventoryPages} 頁
-                            </div>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 32px', gap: '8px', alignItems: 'stretch' }}>
-                            <button
-                                onClick={() => shiftInventoryPage(inventoryTab, -1)}
-                                disabled={activeInventoryPage <= 0}
-                                style={{ height: '100%', opacity: activeInventoryPage <= 0 ? 0.4 : 1 }}
-                            >
-                                {'<'}
-                            </button>
-
                             <div style={{
+                                position: 'absolute', top: 0, left: 0,
                                 display: 'grid',
-                                gridTemplateColumns: `repeat(${inventoryCols}, minmax(0, 1fr))`,
-                                gap: '6px'
+                                gridTemplateColumns: `repeat(15, ${CELL_SIZE}px)`,
+                                gridTemplateRows: `repeat(15, ${CELL_SIZE}px)`
                             }}>
-                                {visibleInventorySlots.map((stack, idx) => {
-                                    const isSelected = !!stack && selectedItemId === stack.id;
+                                {grid.map((row, y) => row.map((cell, x) => {
+                                    const tower = cell.type === 'tower' && engineRef.current
+                                        ? engineRef.current.getTowerAt(x, y)
+                                        : null;
+                                    const cellTexture = getCellTexture(cell);
+                                    const pendingUpgrades = tower ? (tower.pendingUpgrades || 0) : 0;
+                                    const pendingSpecs = tower?.pendingSpecialization ? 1 : 0;
+                                    const pending = pendingUpgrades + pendingSpecs;
+                                    const isReady = pending > 0;
+                                    const hasEquipment = !!tower?.equipmentId || !!tower?.equipmentName;
+
                                     return (
-                                        <button
-                                            key={`inv-slot-${inventoryTab}-${activeInventoryPage}-${idx}`}
-                                            onClick={(e) => {
-                                                if (!stack) return;
-                                                if (stack.id === 'repair_kit' && e.detail < 2) {
-                                                    appendConsoleLog('急救套件：連點兩下可立即使用');
-                                                    return;
-                                                }
-                                                if (tryUseGlobalItem(stack.id)) return;
-                                                setSelectedItemId((prev) => (prev === stack.id ? null : stack.id));
-                                            }}
+                                        <div
+                                            key={`${x}-${y}`}
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => handleCellClick(x, y)}
                                             style={{
-                                                width: '100%',
-                                                aspectRatio: '1 / 1',
-                                                border: isSelected ? '2px solid #7cff9a' : '1px solid #666',
-                                                background: stack ? '#1f1f1f' : '#111',
-                                                color: '#ddd',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                gap: '4px',
-                                                padding: '4px 6px',
-                                                fontSize: '0.75rem'
+                                                width: CELL_SIZE,
+                                                height: CELL_SIZE,
+                                                backgroundColor: getCellColor(cell),
+                                                backgroundImage: cellTexture
+                                                    ? (
+                                                        cell.type === 'build'
+                                                            ? `linear-gradient(rgba(16,16,16,0.36), rgba(16,16,16,0.36)), url(${cellTexture})`
+                                                            : `url(${cellTexture})`
+                                                    )
+                                                    : 'none',
+                                                backgroundSize: 'cover',
+                                                backgroundBlendMode: 'normal',
+                                                opacity: cell.type === 'build' ? 0.72 : 1,
+                                                filter: cell.type === 'build' ? 'saturate(0.58) brightness(0.9)' : 'none',
+                                                border: '1px solid #333',
+                                                cursor: (cell.type === 'build' || (cell.type === 'tower' && (isReady || !!selectedInventoryItem))) ? 'pointer' : 'default',
+                                                position: 'relative',
+                                                userSelect: 'none',
+                                                WebkitUserSelect: 'none',
+                                                animation: isReady ? 'tower-ready-blink 1.1s infinite' : 'none',
+                                                boxShadow: (cell.type === 'tower' && selectedInventoryItem)
+                                                    ? 'inset 0 0 0 2px rgba(126, 213, 255, 0.55)'
+                                                    : 'none'
                                             }}
                                         >
-                                            <span>{stack?.icon || ''}</span>
-                                            <span>{stack?.count || ''}</span>
-                                        </button>
+                                            {cell.type === 'tower' && (
+                                                <div style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    position: 'relative',
+                                                    borderRadius: '4px',
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        inset: 0,
+                                                        border: `2px solid ${getTowerColor(cell.towerType)}`,
+                                                        zIndex: 2,
+                                                        pointerEvents: 'none'
+                                                    }} />
+                                                    {tower && (
+                                                        <div style={{
+                                                            position: 'absolute',
+                                                            bottom: 0,
+                                                            right: 0,
+                                                            width: '16px',
+                                                            height: '16px',
+                                                            background: getTowerLevelColor(tower.level || 1),
+                                                            borderTopLeftRadius: '4px',
+                                                            borderTop: '1px solid #111',
+                                                            borderLeft: '1px solid #111',
+                                                            zIndex: 3,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            color: (tower.level || 1) >= 10 ? '#222' : '#fff',
+                                                            fontSize: '11px',
+                                                            fontWeight: 'bold',
+                                                            textShadow: (tower.level || 1) >= 10 ? 'none' : '1px 1px 1px rgba(0,0,0,0.8)',
+                                                            animation: isReady ? 'tower-ready-blink 1.1s infinite' : 'none',
+                                                        }}>
+                                                            {tower.level}
+                                                        </div>
+                                                    )}
+                                                    {cell.towerType === 'magic' ? (
+                                                        <img src="/magic_tower.png" style={{ width: '85%', height: '85%', objectFit: 'contain', zIndex: 1 }} alt="magic tower" />
+                                                    ) : cell.towerType === 'melee' ? (
+                                                        <img src="/melee_tower.png" style={{ width: '85%', height: '85%', objectFit: 'contain', zIndex: 1 }} alt="melee tower" />
+                                                    ) : cell.towerType === 'projectile' ? (
+                                                        <img src="/projectile_tower.png" style={{ width: '85%', height: '85%', objectFit: 'contain', zIndex: 1 }} alt="projectile tower" />
+                                                    ) : cell.towerType === 'projectile_slow' ? (
+                                                        <img src="/slow_tower.png" style={{ width: '85%', height: '85%', objectFit: 'contain', zIndex: 1 }} alt="slow tower" />
+                                                    ) : cell.towerType === 'projectile_aoe' ? (
+                                                        <img src="/aoe_tower.png" style={{ width: '85%', height: '85%', objectFit: 'contain', zIndex: 1 }} alt="aoe tower" />
+                                                    ) : cell.towerType === 'support' ? (
+                                                        <img src="/support_tower.png" style={{ width: '85%', height: '85%', objectFit: 'contain', zIndex: 1 }} alt="support tower" />
+                                                    ) : (
+                                                        <span style={{ zIndex: 1 }}>{getTowerLabel(cell.towerType)}</span>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {hasEquipment && (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    bottom: 0,
+                                                    left: 0,
+                                                    width: 16,
+                                                    height: 16,
+                                                    borderTopRightRadius: '4px',
+                                                    background: '#4fa6ff',
+                                                    color: '#eaf4ff',
+                                                    fontSize: 11,
+                                                    fontWeight: 800,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    boxShadow: '1px -1px 0 rgba(0,0,0,0.5)',
+                                                    zIndex: 10
+                                                }}>
+                                                    E
+                                                </div>
+                                            )}
+                                        </div>
                                     );
-                                })}
+                                }))}
                             </div>
 
-                            <button
-                                onClick={() => shiftInventoryPage(inventoryTab, 1)}
-                                disabled={activeInventoryPage >= totalInventoryPages - 1}
-                                style={{ height: '100%', opacity: activeInventoryPage >= totalInventoryPages - 1 ? 0.4 : 1 }}
-                            >
-                                {'>'}
-                            </button>
+                            <canvas
+                                ref={canvasRef}
+                                width={600}
+                                height={600}
+                                style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+                            />
+
+                            {gameOver && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    background: 'rgba(0,0,0,0.8)',
+                                    color: 'white',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 30,
+                                    gap: '10px'
+                                }}>
+                                    <h1>遊戲結束</h1>
+                                    <button onClick={handleExitWithRecord}>回主選單</button>
+                                </div>
+                            )}
+
+                            {buildTarget && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '24px',
+                                    left: '24px',
+                                    right: '24px',
+                                    bottom: '24px',
+                                    background: '#222',
+                                    border: '2px solid #66ccff',
+                                    padding: '14px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '8px',
+                                    overflow: 'hidden',
+                                    zIndex: 20
+                                }}>
+                                    <h3>選擇要建造的塔</h3>
+                                    <div style={{ color: '#cde8ff', textAlign: 'left' }}>
+                                        地形: {getTerrainLabel(buildCell?.terrain)} | 效果: {getTerrainEffectText(buildCell?.terrain)}
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gridAutoRows: '1fr', gap: '8px', flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '2px' }}>
+                                        {Object.values(TOWER_TYPES).map((type) => (
+                                            <button
+                                                key={type.id}
+                                                onClick={() => handleBuildTower(type.id)}
+                                                style={{
+                                                    background: '#2f2f2f',
+                                                    border: `2px solid ${type.color}`,
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '4px',
+                                                    alignItems: 'flex-start',
+                                                    textAlign: 'left',
+                                                    justifyContent: 'flex-start',
+                                                    padding: '8px',
+                                                    fontSize: '0.78rem',
+                                                    lineHeight: 1.2
+                                                }}
+                                            >
+                                                <div style={{ fontWeight: 700 }}>{getTowerLabel(type.id)} 塔</div>
+                                                {getBuildPanelLines(type).map((line, idx) => (
+                                                    <div key={`${type.id}-line-${idx}`} style={{ color: idx === 0 ? '#ffffff' : '#cfd6df' }}>
+                                                        {line}
+                                                    </div>
+                                                ))}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '2px' }}>
+                                        <button onClick={() => setBuildTarget(null)}>取消</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {upgradeTarget && upgradeTower && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '60px',
+                                    left: '50px',
+                                    right: '50px',
+                                    bottom: '60px',
+                                    background: '#222',
+                                    border: '2px solid #5eff7a',
+                                    padding: '20px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '10px',
+                                    zIndex: 25
+                                }}>
+                                    <h3>
+                                        {towerPanelMode === 'specialization'
+                                            ? '塔專精三選一'
+                                            : `塔升級選擇（剩餘 ${upgradeTower.pendingUpgrades || 0} 次）`}
+                                    </h3>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', textAlign: 'left', fontSize: '0.9rem', color: '#d6d6d6' }}>
+                                        <div>地形: {getTerrainLabel(upgradeCell?.terrain)}</div>
+                                        <div>地形效果: {getTerrainEffectText(upgradeCell?.terrain)}</div>
+                                        <div>塔等級: {upgradeTower.level}</div>
+                                        {isSupportTower(upgradeTower) ? (
+                                            <>
+                                                <div>輔助經驗: {upgradeTower.supportExp || 0}/15</div>
+                                                <div>靈氣型態: {upgradeTower.supportAuraType || 'attack'}</div>
+                                                <div>靈氣範圍: {(1 + (upgradeTower.supportAuraRangeBonus || 0)).toFixed(1)}</div>
+                                                <div>靈氣效果: +{(upgradeSupportAuraStatus?.effectPct || 0).toFixed(0)}%</div>
+                                                <div>影響塔數: {upgradeSupportAuraStatus?.affectedTowerCount || 0}</div>
+                                                <div>幸運靈氣: {upgradeTower.supportLuckyAura ? `+${(upgradeTower.supportLuckyCritDmgBonus || 0).toFixed(2)} 暴傷` : '未啟用'}</div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div>擊殺計數: {upgradeTower.kills}/10</div>
+                                                <div>基礎傷害: {Math.floor(upgradeTower.stats.damage)}</div>
+                                                <div>攻速: {upgradeTower.stats.speed.toFixed(2)}</div>
+                                                <div>暴擊率: {(upgradeTower.stats.crit * 100).toFixed(0)}%</div>
+                                                <div>攻擊距離: {upgradeTower.stats.range.toFixed(1)}</div>
+                                                <div>靈氣傷害加成: +{(upgradeAuraSnapshot?.damagePct || 0).toFixed(0)}%</div>
+                                                <div>靈氣攻速加成: +{(upgradeAuraSnapshot?.speedPct || 0).toFixed(0)}%</div>
+                                                <div>靈氣暴擊加成: +{(upgradeAuraSnapshot?.critChancePct || 0).toFixed(0)}%</div>
+                                                <div>靈氣暴傷加成: +{(upgradeAuraSnapshot?.critDmgBonus || 0).toFixed(2)}</div>
+                                            </>
+                                        )}
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', flex: 1 }}>
+                                        {upgradeOptions.map((opt) => (
+                                            <button
+                                                key={opt.id}
+                                                onClick={() => handleUpgradeSelect(opt.id)}
+                                                style={{ background: '#333', padding: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}
+                                            >
+                                                <div style={{ fontWeight: 'bold', color: '#7cff9a' }}>{opt.label}</div>
+                                                <div style={{ fontSize: '0.82rem', color: '#ccc' }}>{opt.desc}</div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div style={{ alignSelf: 'flex-end', display: 'flex', gap: '8px' }}>
+                                        {towerPanelMode === 'upgrade' && (
+                                            <button onClick={handleUpgradeReroll}>
+                                                重骰（{(upgradeTower.level || 1) * 20} 金幣）
+                                            </button>
+                                        )}
+                                        <button onClick={closeUpgradePanel}>暫緩</button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    <div style={{ border: '1px solid #444', background: 'rgba(0,0,0,0.28)', padding: '10px', minHeight: '110px', color: '#ddd' }}>
-                        <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>道具說明</div>
-                        {selectedInventoryItem ? (
-                            <div style={{ lineHeight: 1.4 }}>
-                                <div style={{ color: '#fff', fontWeight: 700, marginBottom: '4px' }}>
-                                    {selectedInventoryItem.name} x{selectedInventoryItem.count}
-                                </div>
-                                <div style={{ color: '#bfc6d1', marginBottom: '4px' }}>{selectedInventoryItem.description}</div>
-                                <div style={{ color: '#8dd2ff' }}>
-                                    類型: {selectedInventoryItem.type === ITEM_TYPES.EQUIPMENT ? '裝備（每塔僅 1 件，不可卸下）' : '道具（點塔使用）'}
-                                </div>
-                                <div style={{ color: '#9bcf9f', marginTop: '4px' }}>
-                                    已選取，請點擊地圖上的塔套用
-                                </div>
-                                <div style={{ marginTop: '6px' }}>
-                                    <button onClick={() => setSelectedItemId(null)} style={{ fontSize: '0.78rem', padding: '3px 8px' }}>
-                                        取消選取
-                                    </button>
+                    <div style={{
+                        width: centerInventoryWidth,
+                        border: '2px solid #ddd',
+                        background: 'rgba(0,0,0,0.35)',
+                        padding: '10px',
+                        display: isMobile ? 'none' : 'grid',
+                        gridTemplateColumns: isMobile ? '1fr' : '1.4fr 1fr',
+                        gap: '10px',
+                        margin: '10px auto 0'
+                    }}>
+                        <div style={{
+                            border: '1px solid #444',
+                            background: 'rgba(0,0,0,0.28)',
+                            padding: '8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px'
+                        }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button
+                                    onClick={() => setInventoryTab(ITEM_TYPES.CONSUMABLE)}
+                                    style={{
+                                        border: inventoryTab === ITEM_TYPES.CONSUMABLE ? '1px solid #7cff9a' : '1px solid #555',
+                                        background: inventoryTab === ITEM_TYPES.CONSUMABLE ? '#1f3a25' : '#1f1f1f',
+                                        color: '#ddd',
+                                        padding: '4px 8px',
+                                        fontSize: '0.8rem'
+                                    }}
+                                >
+                                    道具 {inventoryByType[ITEM_TYPES.CONSUMABLE].length > 0 ? `(${inventoryByType[ITEM_TYPES.CONSUMABLE].length})` : ''}
+                                </button>
+                                <button
+                                    onClick={() => setInventoryTab(ITEM_TYPES.EQUIPMENT)}
+                                    style={{
+                                        border: inventoryTab === ITEM_TYPES.EQUIPMENT ? '1px solid #7cff9a' : '1px solid #555',
+                                        background: inventoryTab === ITEM_TYPES.EQUIPMENT ? '#1f2d3a' : '#1f1f1f',
+                                        color: '#ddd',
+                                        padding: '4px 8px',
+                                        fontSize: '0.8rem'
+                                    }}
+                                >
+                                    裝備 {inventoryByType[ITEM_TYPES.EQUIPMENT].length > 0 ? `(${inventoryByType[ITEM_TYPES.EQUIPMENT].length})` : ''}
+                                </button>
+                                <div style={{ marginLeft: 'auto', color: '#89a7bf', fontSize: '0.78rem' }}>
+                                    第 {activeInventoryPage + 1}/{totalInventoryPages} 頁
                                 </div>
                             </div>
-                        ) : (
-                            <div style={{ lineHeight: 1.45 }}>
-                                <div style={{ color: '#bfc6d1' }}>先在左側選擇「道具」或「裝備」分頁，再點選物品。</div>
-                                <div style={{ color: '#8dd2ff' }}>選取後點擊地圖上的塔即可使用或裝備。</div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 32px', gap: '8px', alignItems: 'stretch' }}>
+                                <button
+                                    onClick={() => shiftInventoryPage(inventoryTab, -1)}
+                                    disabled={activeInventoryPage <= 0}
+                                    style={{ height: '100%', opacity: activeInventoryPage <= 0 ? 0.4 : 1 }}
+                                >
+                                    {'<'}
+                                </button>
+
+                                <div style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: `repeat(${inventoryCols}, minmax(0, 1fr))`,
+                                    gap: '6px'
+                                }}>
+                                    {visibleInventorySlots.map((stack, idx) => {
+                                        const isSelected = !!stack && selectedItemId === stack.id;
+                                        return (
+                                            <button
+                                                key={`inv-slot-${inventoryTab}-${activeInventoryPage}-${idx}`}
+                                                onClick={(e) => {
+                                                    if (!stack) return;
+                                                    if (stack.id === 'repair_kit' && e.detail < 2) {
+                                                        appendConsoleLog('急救套件：連點兩下可立即使用');
+                                                        return;
+                                                    }
+                                                    if (tryUseGlobalItem(stack.id)) return;
+                                                    setSelectedItemId((prev) => (prev === stack.id ? null : stack.id));
+                                                }}
+                                                style={{
+                                                    width: '100%',
+                                                    aspectRatio: '1 / 1',
+                                                    border: isSelected ? '2px solid #7cff9a' : '1px solid #666',
+                                                    background: stack ? '#1f1f1f' : '#111',
+                                                    color: '#ddd',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    gap: '4px',
+                                                    padding: '4px 6px',
+                                                    fontSize: '0.75rem'
+                                                }}
+                                            >
+                                                <span>{stack?.icon || ''}</span>
+                                                <span>{stack?.count || ''}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <button
+                                    onClick={() => shiftInventoryPage(inventoryTab, 1)}
+                                    disabled={activeInventoryPage >= totalInventoryPages - 1}
+                                    style={{ height: '100%', opacity: activeInventoryPage >= totalInventoryPages - 1 ? 0.4 : 1 }}
+                                >
+                                    {'>'}
+                                </button>
                             </div>
-                        )}
+                        </div>
+
+                        <div style={{ border: '1px solid #444', background: 'rgba(0,0,0,0.28)', padding: '10px', minHeight: '110px', color: '#ddd' }}>
+                            <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>道具說明</div>
+                            {selectedInventoryItem ? (
+                                <div style={{ lineHeight: 1.4 }}>
+                                    <div style={{ color: '#fff', fontWeight: 700, marginBottom: '4px' }}>
+                                        {selectedInventoryItem.name} x{selectedInventoryItem.count}
+                                    </div>
+                                    <div style={{ color: '#bfc6d1', marginBottom: '4px' }}>{selectedInventoryItem.description}</div>
+                                    <div style={{ color: '#8dd2ff' }}>
+                                        類型: {selectedInventoryItem.type === ITEM_TYPES.EQUIPMENT ? '裝備（每塔僅 1 件，不可卸下）' : '道具（點塔使用）'}
+                                    </div>
+                                    <div style={{ color: '#9bcf9f', marginTop: '4px' }}>
+                                        已選取，請點擊地圖上的塔套用
+                                    </div>
+                                    <div style={{ marginTop: '6px' }}>
+                                        <button onClick={() => setSelectedItemId(null)} style={{ fontSize: '0.78rem', padding: '3px 8px' }}>
+                                            取消選取
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ lineHeight: 1.45 }}>
+                                    <div style={{ color: '#bfc6d1' }}>先在左側選擇「道具」或「裝備」分頁，再點選物品。</div>
+                                    <div style={{ color: '#8dd2ff' }}>選取後點擊地圖上的塔即可使用或裝備。</div>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
                 </div>
 
                 <div style={{
@@ -2590,7 +2836,7 @@ const Game = ({ onExit }) => {
                                             {selectedTowerDetail.equipmentName && <div>裝備: {selectedTowerDetail.equipmentName}</div>}
                                             <div>傷害: {Math.floor(selectedTowerDetail.initialDamage)} + {Math.floor(selectedTowerDetail.bonusBaseDamage)} + 火 {Math.floor(selectedTowerDetail.extraFire)} / 水 {Math.floor(selectedTowerDetail.extraWater)} / 木 {Math.floor(selectedTowerDetail.extraWood)}</div>
                                             <div>暴擊率: {selectedTowerDetail.initialCrit.toFixed(0)}% + ({selectedTowerDetail.extraCrit >= 0 ? '+' : ''}{selectedTowerDetail.extraCrit.toFixed(0)}%)</div>
-                                            <div>暴擊傷害: {INITIAL_CRIT_DMG.toFixed(2)} + ({selectedTowerDetail.extraCritDmg >= 0 ? '+' : ''}{selectedTowerDetail.extraCritDmg.toFixed(2)})</div>
+                                            <div>暴擊傷害: {((INITIAL_CRIT_DMG - 1) * 100).toFixed(0)}% + ({selectedTowerDetail.extraCritDmg >= 0 ? '+' : ''}{(selectedTowerDetail.extraCritDmg * 100).toFixed(0)}%)</div>
                                             <div>攻速: {selectedTowerDetail.initialSpeed.toFixed(2)} + ({selectedTowerDetail.extraSpeed >= 0 ? '+' : ''}{selectedTowerDetail.extraSpeed.toFixed(2)})</div>
                                             <div>距離: {selectedTowerDetail.initialRange.toFixed(1)} + ({selectedTowerDetail.extraRange >= 0 ? '+' : ''}{selectedTowerDetail.extraRange.toFixed(1)})</div>
                                             <div style={{ color: '#ffd99b' }}>靈氣加成: 傷 +{selectedTowerDetail.auraSnapshot.damagePct.toFixed(0)}% | 速 +{selectedTowerDetail.auraSnapshot.speedPct.toFixed(0)}% | 暴 +{selectedTowerDetail.auraSnapshot.critChancePct.toFixed(0)}%</div>

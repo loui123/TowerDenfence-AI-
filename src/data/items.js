@@ -24,7 +24,7 @@ export const ITEM_DEFS = {
         id: 'power_book',
         name: '力量之書',
         type: ITEM_TYPES.CONSUMABLE,
-        description: '塔的傷害 +10%。',
+        description: '塔的基礎點傷 +5。',
         icon: '力',
         source: 'fire'
     },
@@ -34,6 +34,14 @@ export const ITEM_DEFS = {
         type: ITEM_TYPES.CONSUMABLE,
         description: '塔的暴擊率 +10%（最高 100%）。',
         icon: '暴',
+        source: 'all'
+    },
+    crit_dmg_book: {
+        id: 'crit_dmg_book',
+        name: '暴傷之書',
+        type: ITEM_TYPES.CONSUMABLE,
+        description: '塔的暴擊傷害 +20%。',
+        icon: '爆',
         source: 'all'
     },
     build_book: {
@@ -347,39 +355,63 @@ export const ITEM_DEFS = {
         description: '命中有機率觸發一次回響打擊。',
         icon: '響',
         source: 'all'
+    },
+    hard_gloves: {
+        id: 'hard_gloves',
+        name: '堅硬手套',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '暴擊命中時疊加脆弱：目標承受暴擊傷害 +1%（上限 100%）。',
+        icon: '堅',
+        source: 'boss'
+    },
+    toxic_gloves: {
+        id: 'toxic_gloves',
+        name: '毒性手套',
+        type: ITEM_TYPES.EQUIPMENT,
+        description: '造成中毒時，該次中毒傷害改為隨機 0.5~4.0 倍。',
+        icon: '毒',
+        source: 'boss'
     }
 };
 
 export const MONSTER_ITEM_DROP_TABLE = {
     normal: [
-        { itemId: 'crit_book', chance: 0.05 },
+        { itemId: 'crit_book', chance: 0.02 },
+        { itemId: 'crit_dmg_book', chance: 0.02 },
         { itemId: 'speed_book', chance: 0.02 },
-        { itemId: 'build_book', chance: 0.02 }
+        { itemId: 'power_book', chance: 0.04 },
+        { itemId: 'build_book', chance: 0.003 }
     ],
     fire: [
-        { itemId: 'crit_book', chance: 0.05 },
-        { itemId: 'power_book', chance: 0.02 },
-        { itemId: 'build_book', chance: 0.02 }
+        { itemId: 'crit_book', chance: 0.02 },
+        { itemId: 'crit_dmg_book', chance: 0.02 },
+        { itemId: 'power_book', chance: 0.06 },
+        { itemId: 'build_book', chance: 0.003 }
     ],
     water: [
-        { itemId: 'speed_book', chance: 0.05 },
+        { itemId: 'speed_book', chance: 0.04 },
         { itemId: 'crit_book', chance: 0.02 },
-        { itemId: 'build_book', chance: 0.02 }
+        { itemId: 'crit_dmg_book', chance: 0.02 },
+        { itemId: 'build_book', chance: 0.003 }
     ],
     wood: [
         { itemId: 'power_book', chance: 0.05 },
         { itemId: 'crit_book', chance: 0.02 },
-        { itemId: 'build_book', chance: 0.02 }
+        { itemId: 'crit_dmg_book', chance: 0.02 },
+        { itemId: 'speed_book', chance: 0.01 },
+        { itemId: 'build_book', chance: 0.003 }
     ]
 };
 
 export const BOSS_EXTRA_DROP_TABLE = [
-    { itemId: 'build_book', chance: 0.2 },
+    { itemId: 'build_book', chance: 0.08 },
     { itemId: 'level_book', chance: 0.1 },
     { itemId: 'specialization_reset_scroll', chance: 0.02 },
     { itemId: 'lubricant', chance: 0.02 },
     { itemId: 'full_firepower', chance: 0.02 },
     { itemId: 'chain_lightning', chance: 0.02 },
+    { itemId: 'hard_gloves', chance: 0.02 },
+    { itemId: 'toxic_gloves', chance: 0.02 },
     { itemId: 'courage_banner', chance: 0.03 },
     { itemId: 'slaughter_banner', chance: 0.03 },
     { itemId: 'agility_banner', chance: 0.03 }

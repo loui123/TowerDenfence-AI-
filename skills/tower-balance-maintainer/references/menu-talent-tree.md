@@ -1,4 +1,4 @@
-# 選單天賦樹（Main Menu Talent Tree）
+﻿# 選單天賦樹（Main Menu Talent Tree）
 
 ## 1. 位置與用途
 - UI：`src/components/MainMenu/TalentTree.jsx`
@@ -84,10 +84,10 @@
 2. 若影響資源成本，也同步檢查 `src/contexts/GameContext.jsx`。
 3. 更新本檔 `skills/tower-balance-maintainer/references/menu-talent-tree.md`。
 
-## 2026-02-22 �s�W�G�˳Ƥѽ�i�˳�-�l�����O�j
-- �ѽ� id�Gequip_absorption_force
-- ���Ӹ귽�Ggold_ore
-- ��¦��O�G100
-- �̤j���šG1
-- �ĪG�G�}�l�C���ɡA�I�]��o�˳� bsorption_force x1�C
-- ����G���˳ƨӷ��ȭ��D���ѽ�A���|�ѩǪ������C
+## 2026-02-22 更新（主選單天賦：吸附之力）
+- 天賦 id：`equip_absorption_force`
+- 消耗資源：`gold_ore`
+- 基礎花費：`100`
+- 最大等級：`1`
+- 效果：開始遊戲時，立即獲得裝備 `absorption_force` x1。
+- 說明：此裝備為主選單啟用效果，不受關卡內隨機掉落影響。

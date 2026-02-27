@@ -7,7 +7,7 @@ redirects = []
 [functions."*"]
 
 [build]
-publish = "C:\\Source\\TowerDenfence-AI-\\dist"
+publish = "C:\\Souce\\TowerDenfence\\dist"
 publishOrigin = "ui"
 commandOrigin = "ui"
 command = "npm run build"

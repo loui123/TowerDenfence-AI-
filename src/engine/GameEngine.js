@@ -824,7 +824,7 @@ export class GameEngine {
             if (tower?.stats?.type === 'support') return;
             const terrainMods = this.getTowerTerrainModifiers(tower);
             const resonance = this.getTowerResonanceEffects(tower);
-            const globalSpeedMult = this.globalMasteries.speedAura ? 1.1 : 1.0;
+            const globalSpeedMult = this.globalMasteries.speedAura ? 1.05 : 1.0;
             const towerSpeedMult = tower.masterySpeedMult || 1.0;
             const auraBonus = this.getBannerAuraBonuses(tower);
             const globalAuraSpeedMult = this.globalMasteries.attackSpeedAuraMult || 1;
@@ -841,6 +841,9 @@ export class GameEngine {
     }
 
     getAttackTargetCount(tower) {
+        if (tower?.type === 'melee') {
+            return Infinity;
+        }
         if (tower?.stats?.type === 'magic') {
             return 1;
         }
@@ -903,7 +906,7 @@ export class GameEngine {
             (tower?.stats?.crit || 0)
             + (terrainMods?.critBonus || 0)
             + (resonance?.critChanceBonus || 0)
-            + (this.globalMasteries.critAura ? 0.2 : 0)
+            + (this.globalMasteries.critAura ? 0.1 : 0)
             + (this.globalMasteries.critChanceAuraBonus || 0)
             + (auraBonus?.critChance || 0)
         );
@@ -1043,6 +1046,31 @@ export class GameEngine {
                     const isCrit = this.rollCritAgainstMob(p.rawCritChance || 0, target);
                     const dealt = this.damageMob(target, this.scaleDamage(p.damage, p.chainMultiplier || 1), p.sourceTower, isCrit);
                     this.applyOnHitEffects(target, p.sourceTower, dealt);
+
+                    if (p.isNatureFusion) {
+                        const randomAilment = Math.floor(Math.random() * 8);
+                        switch (randomAilment) {
+                            case 0: this.addPoisonStack(target, p.sourceTower, Math.max(1, p.damage.base * 0.2), 5, 0); break;
+                            case 1: {
+                                target.bleedStacks = target.bleedStacks || [];
+                                const perTick = Math.max(1, p.damage.base * 0.2);
+                                target.bleedStacks.push({ damagePerTick: perTick, duration: 5, tickTimer: 1, sourceTowerId: p.sourceTower?.id || null });
+                                this.damageMob(target, { base: perTick, fire: 0, water: 0, wood: 0 }, p.sourceTower, false);
+                                break;
+                            }
+                            case 2: this.applyFrostbite(target, 5); break;
+                            case 3: this.applyScorch(target, p.sourceTower, Math.max(1, p.damage.base * 0.2)); break;
+                            case 4: this.addSlowStack(target, 0.4, 3); target.slowEffectTimer = 3; break;
+                            case 5: this.applyStun(target, 1, 'palsy'); break;
+                            case 6: this.applyStun(target, 0.5, 'stun'); break;
+                            case 7: {
+                                const angle = Math.atan2(target.y - p.y, target.x - p.x);
+                                target.x += Math.cos(angle) * 0.5;
+                                target.y += Math.sin(angle) * 0.5;
+                                break;
+                            }
+                        }
+                    }
                 }
 
                 if (canHit && (p.remainingChains || 0) > 0) {
@@ -1082,9 +1110,18 @@ export class GameEngine {
         }
     }
 
+    formatDamage(value) {
+        if (value >= 100000000) { // 1億
+            return (value / 100000000).toFixed(1) + '億';
+        } else if (value >= 10000) { // 1萬
+            return (value / 10000).toFixed(1) + '萬';
+        }
+        return Math.floor(value).toString();
+    }
+
     damageMob(mob, damageObj, tower, isCrit) {
         let totalDamage = 0;
-        const globalCritDmgBonus = (this.globalMasteries.critDmgAura ? 0.2 : 0) + (this.globalMasteries.critDmgAuraBonus || 0);
+        const globalCritDmgBonus = (this.globalMasteries.critDmgAura ? 0.1 : 0) + (this.globalMasteries.critDmgAuraBonus || 0);
         const auraBonus = tower ? this.getBannerAuraBonuses(tower) : { critDmgBonus: 0, luckCritDmgBonus: 0 };
         const resonance = tower ? this.getTowerResonanceEffects(tower) : { critDmgBonus: 0 };
         let critMult = isCrit
@@ -1109,6 +1146,12 @@ export class GameEngine {
             }
             let finalVal = val * effectiveCritMult;
             let multiplier = 1.0;
+
+            if (mob.isBoss && tower && tower.type === 'melee') {
+                let bossMult = 1 + (tower.upgradeStats?.melee_boss_dmg || 0) * 0.5;
+                if (tower.specializationId === 'spec_tower_boss_killer') bossMult += 2.0;
+                finalVal *= Math.max(1, bossMult);
+            }
 
             if (mob.type === 'wood' && typeId === 'fire') multiplier = 2.0;
             if (mob.type === 'fire' && typeId === 'water') multiplier = 2.0;
@@ -1149,6 +1192,13 @@ export class GameEngine {
             }
 
             const equipmentLevel = this.getTowerEquipmentLevel(tower);
+            if (mob?.isBoss) {
+                const bossDmgBonus = (tower?.upgradeStats?.melee_boss_dmg || 0) * 0.5;
+                const bossKillerBonus = tower?.specBossKiller ? 2.0 : 0;
+                if (bossDmgBonus > 0 || bossKillerBonus > 0) {
+                    finalVal *= (1 + bossDmgBonus + bossKillerBonus);
+                }
+            }
             if (tower?.equipmentId === 'giant_slayer' && mob?.isBoss) {
                 finalVal *= (1 + (0.6 * Math.max(1, equipmentLevel)));
             }
@@ -1167,7 +1217,7 @@ export class GameEngine {
             this.floatingTexts.push({
                 x: mob.x + 0.5 + offsetX,
                 y: mob.y + offsetY - 0.5,
-                text: Math.floor(finalVal).toString() + (multiplier > 1 ? '!' : ''),
+                text: this.formatDamage(finalVal) + (multiplier > 1 ? '!' : ''),
                 color: isCrit ? '#ffff00' : color,
                 forceColor: color,
                 life: 0.8,
@@ -1276,23 +1326,21 @@ export class GameEngine {
 
         switch (upgradeType) {
             case 'fire_dmg':
-                tower.stats.extraFire = (tower.stats.extraFire || 0) + (tower.stats.damage * 0.25);
                 tower.lockedElement = tower.lockedElement || 'fire';
                 break;
             case 'water_dmg':
-                tower.stats.extraWater = (tower.stats.extraWater || 0) + (tower.stats.damage * 0.25);
                 tower.lockedElement = tower.lockedElement || 'water';
                 break;
             case 'wood_dmg':
-                tower.stats.extraWood = (tower.stats.extraWood || 0) + (tower.stats.damage * 0.25);
                 tower.lockedElement = tower.lockedElement || 'wood';
                 break;
-            case 'base_dmg': tower.stats.damage *= 1.25; break;
+            case 'base_dmg':
+                break;
             case 'base_magic_dmg':
-                tower.stats.damage += 20;
+                tower.baseMagicDmgBonus = (tower.baseMagicDmgBonus || 0) + 20;
                 break;
             case 'crit_chance': tower.stats.crit = (tower.stats.crit || 0) + 0.1; break;
-            case 'crit_dmg': tower.stats.critDmg = (tower.stats.critDmg || 1.5) + 0.2; break;
+            case 'crit_dmg': tower.stats.critDmg = (tower.stats.critDmg || 2.0) + 0.2; break;
             case 'speed': tower.stats.speed *= 1.1; break;
             case 'range': tower.stats.range += 1; break;
             case 'proj_chain_up': tower.bonusChain = (tower.bonusChain || 0) + 1; break;
@@ -1311,6 +1359,8 @@ export class GameEngine {
                 break;
             case 'addition_attack':
                 tower.additionalAttackCount = (tower.additionalAttackCount || 0) + 1;
+                break;
+            case 'melee_boss_dmg':
                 break;
             case 'slow_power_up':
                 tower.slowPowerLevel = (tower.slowPowerLevel || 0) + 1;
@@ -1424,6 +1474,7 @@ export class GameEngine {
         tower.upgradeStats[upgradeType] = (tower.upgradeStats[upgradeType] || 0) + 1;
 
         tower.pendingUpgrades = Math.max(0, (tower.pendingUpgrades || 0) - 1);
+        this.recalculateTowerDamage(tower);
         return true;
     }
 
@@ -1651,7 +1702,7 @@ export class GameEngine {
                 tower.chainNoLimit = true;
                 break;
             case 'spec_tower_speed_50':
-                tower.masterySpeedMult = (tower.masterySpeedMult || 1) * 1.2;
+                tower.masterySpeedMult = (tower.masterySpeedMult || 1) * 1.4;
                 break;
             case 'spec_tower_base_100':
                 tower.stats.damage *= 2.0;
@@ -1678,6 +1729,9 @@ export class GameEngine {
             case 'spec_tower_half_dmg_double_speed':
                 tower.stats.damage *= 0.5;
                 tower.masterySpeedMult = (tower.masterySpeedMult || 1) * 2.0;
+                break;
+            case 'spec_tower_boss_killer':
+                tower.specBossKiller = true;
                 break;
             case 'spec_tower_bleed':
                 tower.bleedDamageMult = (tower.bleedDamageMult || 1) * 3.0;
@@ -1758,6 +1812,7 @@ export class GameEngine {
         tower.specializationChosen = true;
         tower.specializationId = specId;
         this.recomputeGlobalMasteriesFromSpecializations();
+        this.recalculateTowerDamage(tower);
         return true;
     }
 
@@ -1952,7 +2007,7 @@ export class GameEngine {
 
     getWaveHpScale(wave) {
         if (wave <= 10) return 1;
-        return Math.pow(1.2, wave - 10);
+        return Math.pow(1.1, wave - 10);
     }
 
     getWaveMobCountScale(wave) {
@@ -2044,7 +2099,14 @@ export class GameEngine {
             return pct;
         }
 
-        let pct = 0.15 + (level * 0.15);
+        let basePct = 0.15;
+        let perLevelPct = 0.15;
+        if (auraType === 'speed') {
+            basePct = 0.05; // nerfed from 0.10
+            perLevelPct = 0.08; // nerfed from 0.15
+        }
+
+        let pct = basePct + (level * perLevelPct);
         if (tower.supportAuraDouble) pct *= 2;
         return pct;
     }
@@ -2183,11 +2245,11 @@ export class GameEngine {
             const dot = (moveDir.x * toCenter.x) + (moveDir.y * toCenter.y);
 
             if (dot > 0.1) {
-                // Moving toward tornado center -> speed up.
-                mult *= 1.3;
+                // Moving toward tornado center -> speed up significantly (sucked in)
+                mult *= 2.0;
             } else if (dot < -0.1) {
-                // Moving away from tornado center -> slow down.
-                mult *= 0.7;
+                // Moving away from tornado center -> slow down massively (struggling to escape)
+                mult *= 0.2;
             }
         }
 
@@ -2597,6 +2659,43 @@ export class GameEngine {
         return { ok: false, message: '此裝備尚未實作效果。' };
     }
 
+    recalculateTowerDamage(tower) {
+        if (!tower || !tower.stats) return;
+        const typeDef = Object.values(TOWER_TYPES).find(t => t.id === tower.type) || TOWER_TYPES.MELEE;
+        const baseDmg = typeDef.stats?.damage || 1;
+        const mods = this.getTowerTalentModifiersForType(tower.type);
+
+        let powerBookBase = (tower.powerBookStacks || 0) * 5;
+        let absorptionBase = tower.absorptionKillCount || 0;
+        let magicBase = tower.baseMagicDmgBonus || 0;
+
+        let overrideBase = null;
+        const eqLv = this.getTowerEquipmentLevel(tower);
+        if (tower.equipmentId === 'full_firepower') {
+            overrideBase = 40 + 12 * (eqLv - 1);
+        }
+
+        let flatBase = (overrideBase ?? baseDmg) + (mods.baseDamageBonus || 0) + powerBookBase + absorptionBase + magicBase;
+
+        let pctMult = mods.attrDamageMult || 1;
+        pctMult += (tower.upgradeStats?.base_dmg || 0) * 0.25;
+        if (tower.specBase100) pctMult += 1.0;
+        if (tower.specAttrOffTriple) pctMult += 2.0;
+
+        let finalDamage = flatBase * Math.max(0.1, pctMult);
+        if (tower.specHalfDamage) finalDamage *= 0.5;
+
+        // Fortify book modifier (it was *1.2 per stack before)
+        if (tower.fortifyBookStacks) {
+            finalDamage *= Math.pow(1.2, tower.fortifyBookStacks);
+        }
+
+        tower.stats.damage = finalDamage;
+        tower.stats.extraFire = finalDamage * 0.25 * (tower.upgradeStats?.fire_dmg || 0);
+        tower.stats.extraWater = finalDamage * 0.25 * (tower.upgradeStats?.water_dmg || 0);
+        tower.stats.extraWood = finalDamage * 0.25 * (tower.upgradeStats?.wood_dmg || 0);
+    }
+
     applyInventoryItem(tower, itemId) {
         if (!tower || !itemId) {
             return { ok: false, message: '請先選擇塔與道具。' };
@@ -2624,13 +2723,14 @@ export class GameEngine {
                 tower.speedBookStacks = nextStacks;
                 return { ok: true, message: `${item.name} 使用成功` };
             }
+            if (itemId === 'crit_dmg_book') {
+                tower.stats.critDmgBookBonus = (tower.stats.critDmgBookBonus || 0) + 0.2;
+                tower.stats.critDmg = (tower.stats.critDmg || 2.0) + 0.2;
+                return { ok: true, message: `${item.name} 使用成功` };
+            }
             if (itemId === 'power_book') {
-                const currentStacks = Math.max(0, Math.floor(tower.powerBookStacks || 0));
-                const nextStacks = currentStacks + 1;
-                const prevMult = 1 + (0.1 * currentStacks);
-                const nextMult = 1 + (0.1 * nextStacks);
-                tower.stats.damage = Math.max(0.0001, (tower.stats.damage || 0) / prevMult * nextMult);
-                tower.powerBookStacks = nextStacks;
+                tower.powerBookStacks = (tower.powerBookStacks || 0) + 1;
+                this.recalculateTowerDamage(tower);
                 return { ok: true, message: `${item.name} 使用成功` };
             }
             if (itemId === 'crit_book') {
@@ -3003,13 +3103,13 @@ export class GameEngine {
         const duration = (sourceTower.bleedDurationOverride || 4) + (resonance.bleedDurationBonus || 0);
         const bleedReduction = Math.max(0, target.affixMap?.bleed_dmg_reduction || 0);
         const perTick = sourceTower.stats.damage * (0.3 * level) * bleedMult * (resonance.bleedDamageMult || 1) * (1 - bleedReduction);
-        target.bleedMap = {};
-        target.bleedMap[sourceTower.id] = {
+        target.bleedStacks = target.bleedStacks || [];
+        target.bleedStacks.push({
             damagePerTick: perTick,
             duration,
             tickTimer: 1,
             sourceTowerId: sourceTower.id
-        };
+        });
 
         // Immediate burst on apply/refresh.
         this.damageMob(target, { base: perTick, fire: 0, water: 0, wood: 0 }, sourceTower, false);
@@ -3041,7 +3141,6 @@ export class GameEngine {
 
     applyFireExplosion(centerTarget, sourceTower, damage, radius) {
         const spellAuraMult = this.getSupportSpellDamageMultForTower(sourceTower);
-        this.addEffect(centerTarget.x + 0.5, centerTarget.y + 0.5, 'fire_spell', { life: 0.35, maxLife: 0.35, radius });
         const radiusSq = radius * radius;
         const hasFireMagic = this.getTowerMagicElements(sourceTower).includes('fire');
         const ailmentPower = Math.max(1, sourceTower?.magicAilmentPowerMult || 1);
@@ -3050,6 +3149,7 @@ export class GameEngine {
             const dx = mob.x - centerTarget.x;
             const dy = mob.y - centerTarget.y;
             if (dx * dx + dy * dy <= radiusSq) {
+                this.addEffect(mob.x + 0.5, mob.y + 0.5, 'fire_spell', { life: 0.35, maxLife: 0.35, radius: 1 });
                 this.damageMob(mob, { base: 0, fire: damage * spellAuraMult, water: 0, wood: 0 }, sourceTower, false);
                 if (hasFireMagic) {
                     mob.fireVulnerabilityStacks = Math.min(5, (mob.fireVulnerabilityStacks || 0) + 1);
@@ -3134,21 +3234,54 @@ export class GameEngine {
 
         const level = Math.max(1, sourceTower.magicElementLevel || 1);
         const sourceBase = sourceTower.stats.damage || 0;
-        const ailmentPower = Math.max(1, sourceTower.magicAilmentPowerMult || 1);
 
         if (sourceTower.specializationId === 'spec_magic_combo_wood_fire' && magicElements.includes('wood') && magicElements.includes('fire')) {
-            this.applyWoodFireFusion(primaryTarget, sourceTower, 1.6 * ailmentPower);
-            this.spawnFusionControlZone(primaryTarget.x, primaryTarget.y, sourceTower, 'wood_fire');
+            this.areaEffects = this.areaEffects.filter(e => !(e.type === 'fusion_fire_wood' && e.sourceTowerId === sourceTower.id));
+            this.areaEffects.push({
+                type: 'fusion_fire_wood',
+                x: primaryTarget.x,
+                y: primaryTarget.y,
+                sourceTowerId: sourceTower.id,
+                life: 3,
+                maxLife: 3,
+                pullTickTimer: 0,
+                damageTickTimer: 0
+            });
             return;
         }
         if (sourceTower.specializationId === 'spec_magic_combo_fire_water' && magicElements.includes('fire') && magicElements.includes('water')) {
-            this.applyFireWaterFusion(primaryTarget, sourceTower, 1.6 * ailmentPower);
-            this.spawnFusionControlZone(primaryTarget.x, primaryTarget.y, sourceTower, 'fire_water');
+            this.areaEffects = this.areaEffects.filter(e => !(e.type === 'fusion_fire_water' && e.sourceTowerId === sourceTower.id));
+            this.areaEffects.push({
+                type: 'fusion_fire_water',
+                x: primaryTarget.x,
+                y: primaryTarget.y,
+                sourceTowerId: sourceTower.id,
+                life: 3,
+                maxLife: 3,
+                pullTickTimer: 0,
+                damageTickTimer: 0
+            });
             return;
         }
         if (sourceTower.specializationId === 'spec_magic_combo_water_wood' && magicElements.includes('water') && magicElements.includes('wood')) {
-            this.applyWaterWoodFusion(primaryTarget, sourceTower, 1.6 * ailmentPower);
-            this.spawnFusionControlZone(primaryTarget.x, primaryTarget.y, sourceTower, 'water_wood');
+            const numProjectiles = 6 + Math.floor(Math.random() * 4);
+            const baseDamage = (sourceTower.stats?.damage || 0) + (this.wave * 10);
+            for (let i = 0; i < numProjectiles; i++) {
+                const target = this.mobs[Math.floor(Math.random() * this.mobs.length)];
+                if (!target) continue;
+                this.projectiles.push({
+                    x: sourceTower.x,
+                    y: sourceTower.y,
+                    targetId: target.id,
+                    lastKnownTargetX: target.x,
+                    lastKnownTargetY: target.y,
+                    speed: 12 + Math.random() * 6,
+                    damage: { base: baseDamage, fire: 0, water: 0, wood: 0 },
+                    sourceTower,
+                    isNatureFusion: true,
+                    visualType: Math.random() > 0.5 ? 'leaf' : 'water_drop'
+                });
+            }
             return;
         }
 
@@ -3173,12 +3306,12 @@ export class GameEngine {
 
     applyWaterSplash(centerTarget, sourceTower, damage, radius) {
         const spellAuraMult = this.getSupportSpellDamageMultForTower(sourceTower);
-        this.addEffect(centerTarget.x + 0.5, centerTarget.y + 0.5, 'water_spell', { life: 0.35, maxLife: 0.35, radius });
         const radiusSq = radius * radius;
         for (const mob of this.mobs) {
             const dx = mob.x - centerTarget.x;
             const dy = mob.y - centerTarget.y;
             if (dx * dx + dy * dy <= radiusSq) {
+                this.addEffect(mob.x + 0.5, mob.y + 0.5, 'water_spell', { life: 0.35, maxLife: 0.35, radius: 1.2 });
                 this.damageMob(mob, { base: 0, fire: 0, water: damage * spellAuraMult, wood: 0 }, sourceTower, false);
                 mob.magicWaterSlowStacks = Math.min(5, (mob.magicWaterSlowStacks || 0) + 1);
                 if ((sourceTower?.magicWaterFrostbiteTalent || 0) > 0) {
@@ -3212,10 +3345,14 @@ export class GameEngine {
     }
 
     updateAreaEffects(dt) {
+        for (const mob of this.mobs) {
+            mob.pullingEffectIndex = undefined;
+        }
+
         for (let i = this.areaEffects.length - 1; i >= 0; i--) {
             const eff = this.areaEffects[i];
             eff.life -= dt;
-            if (eff.type === 'tornado') {
+            if (eff.type === 'tornado' || eff.type === 'fusion_fire_wood' || eff.type === 'fusion_fire_water') {
                 eff.damageTickTimer -= dt;
                 eff.pullTickTimer -= dt;
             }
@@ -3270,6 +3407,58 @@ export class GameEngine {
                 }
             }
 
+            if (eff.type === 'fusion_fire_wood' || eff.type === 'fusion_fire_water') {
+                const src = this.towers.find((t) => t.id === eff.sourceTowerId) || null;
+                const pullRadiusSq = 4.5 * 4.5;
+                const damageRadiusSq = 1.5 * 1.5;
+
+                while (eff.pullTickTimer <= 0) {
+                    eff.pullTickTimer += 0.02;
+                    for (const mob of this.mobs) {
+                        const dx = eff.x - mob.x;
+                        const dy = eff.y - mob.y;
+                        const distSq = dx * dx + dy * dy;
+                        if (distSq <= pullRadiusSq) {
+                            if (mob.pullingEffectIndex === undefined || mob.pullingEffectIndex === i) {
+                                mob.pullingEffectIndex = i;
+                                const dist = Math.sqrt(distSq) || 1;
+                                const pull = Math.min(0.01, dist);
+                                mob.x += (dx / dist) * pull;
+                                mob.y += (dy / dist) * pull;
+                                this.addSlowStack(mob, 0.85, 0.3);
+                                mob.slowEffectTimer = Math.max(mob.slowEffectTimer || 0, 0.2);
+                                this.registerControlEffect(mob, 'slow');
+                            }
+                        }
+                    }
+                }
+
+                while (eff.damageTickTimer <= 0) {
+                    eff.damageTickTimer += 0.5;
+                    const spellAuraMult = src ? this.getSupportSpellDamageMultForTower(src) : 1;
+                    const baseBaseDamage = src ? (src.stats?.damage || 0) : 0;
+                    const dmgNum = baseBaseDamage + (this.wave * 5);
+                    const damageObj = eff.type === 'fusion_fire_wood'
+                        ? { base: 0, fire: dmgNum * spellAuraMult * 0.5, water: 0, wood: dmgNum * spellAuraMult * 0.5 }
+                        : { base: 0, fire: dmgNum * spellAuraMult * 0.5, water: dmgNum * spellAuraMult * 0.5, wood: 0 };
+
+                    for (const mob of this.mobs) {
+                        const dx = eff.x - mob.x;
+                        const dy = eff.y - mob.y;
+                        const distSq = dx * dx + dy * dy;
+                        if (distSq <= damageRadiusSq) {
+                            this.damageMob(mob, damageObj, src, false);
+
+                            const ailmentDmg = Math.max(1, dmgNum * 0.2);
+                            this.applyScorch(mob, src, ailmentDmg);
+                            this.applyScorch(mob, src, ailmentDmg);
+                            this.addPoisonStack(mob, src, ailmentDmg, 5, src?.poisonFrequencyLevel || 0);
+                            this.addPoisonStack(mob, src, ailmentDmg, 5, src?.poisonFrequencyLevel || 0);
+                        }
+                    }
+                }
+            }
+
             if (eff.type === 'fusion_control') {
                 const sourceTower = eff.sourceTowerId ? (this.towers.find((t) => t.id === eff.sourceTowerId) || null) : null;
                 const radiusSq = (eff.radius || 3.5) * (eff.radius || 3.5);
@@ -3292,10 +3481,13 @@ export class GameEngine {
                         }
 
                         if ((eff.mode === 'wood_fire' || eff.mode === 'water_wood') && distSq <= pullRadiusSq) {
-                            const dist = Math.sqrt(distSq) || 1;
-                            const pull = Math.min(0.014, dist);
-                            mob.x += (dx / dist) * pull;
-                            mob.y += (dy / dist) * pull;
+                            if (mob.pullingEffectIndex === undefined || mob.pullingEffectIndex === i) {
+                                mob.pullingEffectIndex = i;
+                                const dist = Math.sqrt(distSq) || 1;
+                                const pull = Math.min(0.014, dist);
+                                mob.x += (dx / dist) * pull;
+                                mob.y += (dy / dist) * pull;
+                            }
                         }
 
                         if (eff.mode === 'fire_water' && distSq <= radiusSq && sourceTower && Math.random() < 0.12) {
@@ -3349,21 +3541,21 @@ export class GameEngine {
             }
         }
 
-        if (mob.bleedMap) {
-            for (const key of Object.keys(mob.bleedMap)) {
-                const entry = mob.bleedMap[key];
-                entry.duration -= dt;
-                entry.tickTimer -= dt;
+        if (mob.bleedStacks && mob.bleedStacks.length > 0) {
+            for (let i = mob.bleedStacks.length - 1; i >= 0; i--) {
+                const stack = mob.bleedStacks[i];
+                stack.duration -= dt;
+                stack.tickTimer -= dt;
 
-                while (entry.tickTimer <= 0 && entry.duration > 0 && this.mobs.includes(mob)) {
-                    entry.tickTimer += 1;
-                    const sourceTower = this.towers.find(t => t.id === entry.sourceTowerId);
-                    this.damageMob(mob, { base: entry.damagePerTick, fire: 0, water: 0, wood: 0 }, sourceTower, false);
+                while (stack.tickTimer <= 0 && stack.duration > 0 && this.mobs.includes(mob)) {
+                    stack.tickTimer += 1;
+                    const sourceTower = this.towers.find(t => t.id === stack.sourceTowerId);
+                    this.damageMob(mob, { base: stack.damagePerTick, fire: 0, water: 0, wood: 0 }, sourceTower, false);
                     if (!this.mobs.includes(mob)) return;
                 }
 
-                if (entry.duration <= 0) {
-                    delete mob.bleedMap[key];
+                if (stack.duration <= 0) {
+                    mob.bleedStacks.splice(i, 1);
                 }
             }
         }
