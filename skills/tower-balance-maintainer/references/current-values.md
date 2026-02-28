@@ -525,7 +525,7 @@
 - `range`｜攻擊距離 +1｜提升攻擊範圍｜條件：`maxCount=4`
 - `proj_chain_up`｜連鎖次數 +1｜投射物額外連鎖一次｜條件：`onlyProjectile`、`maxCount=4`
 - `proj_count_up`｜攻擊數量 +1｜投射物額外命中目標 +1｜條件：`onlyProjectile`、`maxCount=2`
-- `melee_bleed`｜附加流血｜近戰命中後 4 秒流血，每秒 30% 傷害（每級 +30%，不可疊加）｜條件：`onlyMelee`
+- `melee_bleed`｜附加流血｜近戰命中，25%機率附加流血效果(增加怪物承受傷害30%)三秒。怪物下次受到流血效果的攻擊時，會額外受到一次當次傷害｜條件：`onlyMelee`
 - `addition_attack`｜額外攻擊 +1｜命中時追加 50% 基礎傷害攻擊｜條件：`onlyMelee`、`maxCount=3`
 - `slow_power_up`｜緩速效果增加 +10%｜緩速塔每級額外 +10% 緩速 緩速效果達到上限改為增加怪物承受傷害｜條件：`onlySlowTower`、`maxCount=3`
 - `knockback_up`｜攻擊爆炸擊退距離 +0.25｜砲擊塔爆炸命中時：擊退距離 +0.25，且每次擊退使該塔對該怪承傷 +10%（上限 +50%）｜條件：`onlyArtillery`
@@ -566,14 +566,14 @@
 - `spec_magic_combo_wood_fire`｜焚森術｜攻擊時機率觸發法術-焚森術(取代原本的龍捲風法術及炎暴法術)｜條件：`elemental_wood_magic>=1 且 elemental_fire_magic>=1`
 - `spec_magic_combo_fire_water`｜蒸潮術｜攻擊時機率觸發法術-蒸潮術(取代原本的炎暴法術及水球法術)｜條件：`elemental_fire_magic>=1 且 elemental_water_magic>=1`
 - `spec_magic_combo_water_wood`｜潮林術｜攻擊時機率觸發法術-潮林術(取代原本的水球法術及龍捲風法術)｜條件：`elemental_water_magic>=1 且 elemental_wood_magic>=1`
-- `spec_magic_dual_ailment`｜雙異常共鳴｜該塔造成的異常效果及異常傷害提升200%｜條件：`magic_water_frostbite_talent` `magic_wood_poison_talent` `magic_fire_scorch_talent`  任兩個都大於一等
+- `spec_magic_dual_ailment`｜雙異常共鳴｜全塔造成的異常效果及異常傷害提升70%｜條件：`magic_water_frostbite_talent` `magic_wood_poison_talent` `magic_fire_scorch_talent`  任兩個都大於一等
 
 ### C) 輔助塔三選一（`SUPPORT_UPGRADE_POOL`）
-- `support_attack_aura_up`｜強化攻擊靈氣效果｜攻擊靈氣效果每級 +15%｜條件：`requireAura=attack`
-- `support_speed_aura_up`｜強化速度靈氣效果｜速度靈氣效果每級 +15%｜條件：`requireAura=speed`
-- `support_slow_aura_up`｜強化緩速靈氣效果｜緩速靈氣效果每級 +15%｜條件：`requireAura=slow`
-- `support_crit_aura_up`｜強化暴擊靈氣效果｜暴擊靈氣效果每級 +15%｜條件：`requireAura=crit`
-- `support_spell_aura_up`｜強化法術靈氣效果｜法術靈氣每級 +20%（最高 5 級）｜條件：`requireAura=spell`、`maxCount=5`
+- `support_attack_aura_up`｜強化攻擊靈氣效果｜攻擊靈氣效果每級 +10%｜條件：`requireAura=attack`
+- `support_speed_aura_up`｜強化速度靈氣效果｜速度靈氣效果每級 +10%｜條件：`requireAura=speed`
+- `support_slow_aura_up`｜強化緩速靈氣效果｜緩速靈氣效果每級 +10%｜條件：`requireAura=slow`
+- `support_crit_aura_up`｜強化暴擊靈氣效果｜暴擊靈氣效果每級 +10%｜條件：`requireAura=crit`
+- `support_spell_aura_up`｜強化法術靈氣效果｜法術靈氣每級 +10%（最高 5 級）｜條件：`requireAura=spell`、`maxCount=5`
 - `support_convert_speed_aura`｜轉換為速度靈氣｜將攻擊靈氣轉為速度靈氣（僅一次）｜條件：`requireAura=attack`、`isConvert`
 - `support_convert_slow_aura`｜轉換為緩速靈氣｜將攻擊靈氣轉為緩速靈氣（僅一次）｜條件：`requireAura=attack`、`isConvert`
 - `support_convert_crit_aura`｜轉換為暴擊靈氣｜將攻擊靈氣轉為暴擊靈氣（僅一次）｜條件：`requireAura=attack`、`isConvert`
@@ -581,13 +581,13 @@
 - `support_aura_range_up`｜範圍增加 1 格｜當前靈氣範圍 +1
 - `support_gain_level_book`｜獲得經驗之書 x1｜立即獲得 1 本經驗之書
 - `support_gain_speed_book`｜獲得速度之書 x1｜立即獲得 1 本速度之書
-- `support_gain_power_book`｜獲得力量之書 x1｜立即獲得 1 本力量之書
+- `support_gain_power_book`｜獲得力量之書 x1｜立即獲得 2 本力量之書
 - `support_gain_crit_book`｜獲得暴擊之書 x1｜立即獲得 1 本暴擊之書
 - `support_gain_gold_1000`｜獲得金幣 1000｜立即獲得 1000 金幣
 
 ### D) 輔助塔專精（`SUPPORT_SPECIALIZATION_POOL`）
 - `support_spec_level_books_10`｜經驗之書 x5｜立即獲得 5 本經驗之書
-- `support_spec_speed_books_10`｜速度之書 x15｜立即獲得 15 本速度之書
+- `support_spec_speed_books_10`｜速度之書 x15｜立即獲得 5 本速度之書
 - `support_spec_power_books_10`｜力量之書 x15｜立即獲得 15 本力量之書
 - `support_spec_crit_books_10`｜暴擊傷害之書 x5｜立即獲得 5 本暴擊傷害之書
 - `support_spec_double_aura`｜靈氣效果翻倍｜當前塔的靈氣效果提升一倍

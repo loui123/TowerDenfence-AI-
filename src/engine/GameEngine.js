@@ -1179,6 +1179,10 @@ export class GameEngine {
                 finalVal *= (1 - mob.affixMap.elemental_dmg_reduction);
             }
 
+            if ((mob.meleeBleedTimer || 0) > 0) {
+                finalVal *= 1.30;
+            }
+
             const ailmentTerrainMods = this.getMobAilmentTerrainModifiers(mob);
             const slowOverflowTakenBonus = Math.max(0, mob.slowOverflowDamageTakenBonus || 0)
                 + Math.max(0, mob.supportSlowOverflowDamageTakenBonus || 0)
@@ -1436,7 +1440,7 @@ export class GameEngine {
                 break;
             case 'support_gain_power_book':
                 if (tower.type !== 'support') return false;
-                this.events?.onItemDrop?.('power_book', 1, 'support');
+                this.events?.onItemDrop?.('power_book', 2, 'support');
                 break;
             case 'support_gain_crit_book':
                 if (tower.type !== 'support') return false;
@@ -1650,7 +1654,7 @@ export class GameEngine {
                     this.events?.onItemDrop?.('level_book', 5, 'support_spec');
                     break;
                 case 'support_spec_speed_books_10':
-                    this.events?.onItemDrop?.('speed_book', 15, 'support_spec');
+                    this.events?.onItemDrop?.('speed_book', 5, 'support_spec');
                     break;
                 case 'support_spec_power_books_10':
                     this.events?.onItemDrop?.('power_book', 15, 'support_spec');
@@ -2100,16 +2104,15 @@ export class GameEngine {
         if (auraType === 'spell') level = tower.supportSpellAuraLevel || 0;
 
         if (auraType === 'spell') {
-            let pct = Math.min(1, Math.max(0, level * 0.2));
+            let pct = Math.min(1, Math.max(0, level * 0.10));
             if (tower.supportAuraDouble) pct *= 2;
             return pct;
         }
 
         let basePct = 0.15;
-        let perLevelPct = 0.15;
+        let perLevelPct = 0.10;
         if (auraType === 'speed') {
             basePct = 0.05; // nerfed from 0.10
-            perLevelPct = 0.08; // nerfed from 0.15
         }
 
         let pct = basePct + (level * perLevelPct);
@@ -2315,7 +2318,7 @@ export class GameEngine {
         const resonance = this.getTowerResonanceEffects(sourceTower);
 
         if (sourceTower.type === 'melee' || (sourceTower.bleedLevel || 0) > 0) {
-            this.applyBleed(primaryTarget, sourceTower);
+            this.applyBleed(primaryTarget, sourceTower, hitDamage);
         }
 
         if (sourceTower.type === 'projectile_slow') {
@@ -2393,7 +2396,7 @@ export class GameEngine {
         if (!primaryTarget || !sourceTower?.equipmentId) return;
         const equipmentLevel = this.getTowerEquipmentLevel(sourceTower);
 
-        if (sourceTower.equipmentId === 'chain_lightning') {
+        if (sourceTower.equipmentId === 'chain_lightning' && Math.random() < 0.40) {
             const spellAuraMult = this.getSupportSpellDamageMultForTower(sourceTower);
             const damage = Math.max(1, (sourceTower.stats?.damage || 0) * spellAuraMult);
             const chainBonus = Math.max(0, this.getChainCount(sourceTower));
@@ -2725,8 +2728,8 @@ export class GameEngine {
             if (itemId === 'speed_book') {
                 const currentStacks = Math.max(0, Math.floor(tower.speedBookStacks || 0));
                 const nextStacks = currentStacks + 1;
-                const prevMult = 1 + (0.1 * currentStacks);
-                const nextMult = 1 + (0.1 * nextStacks);
+                const prevMult = 1 + (0.05 * currentStacks);
+                const nextMult = 1 + (0.05 * nextStacks);
                 tower.stats.speed = Math.max(0.0001, (tower.stats.speed || 0) / prevMult * nextMult);
                 tower.speedBookStacks = nextStacks;
                 return { ok: true, message: `${item.name} 使用成功` };
@@ -2742,7 +2745,7 @@ export class GameEngine {
                 return { ok: true, message: `${item.name} 使用成功` };
             }
             if (itemId === 'crit_book') {
-                tower.stats.crit = (tower.stats.crit || 0) + 0.1;
+                tower.stats.crit = (tower.stats.crit || 0) + 0.05;
                 return { ok: true, message: `${item.name} 使用成功` };
             }
             if (itemId === 'build_book') {
@@ -3102,25 +3105,25 @@ export class GameEngine {
         target.scorchTickTimer = Math.min(1, target.scorchTickTimer || 1);
     }
 
-    applyBleed(target, sourceTower) {
+    applyBleed(target, sourceTower, hitDamage = 0) {
         const level = sourceTower.bleedLevel || 0;
         if (level <= 0) return;
 
-        const resonance = this.getTowerResonanceEffects(sourceTower);
-        const bleedMult = sourceTower.bleedDamageMult || 1;
-        const duration = (sourceTower.bleedDurationOverride || 4) + (resonance.bleedDurationBonus || 0);
-        const bleedReduction = Math.max(0, target.affixMap?.bleed_dmg_reduction || 0);
-        const perTick = sourceTower.stats.damage * (0.3 * level) * bleedMult * (resonance.bleedDamageMult || 1) * (1 - bleedReduction);
-        target.bleedStacks = target.bleedStacks || [];
-        target.bleedStacks.push({
-            damagePerTick: perTick,
-            duration,
-            tickTimer: 1,
-            sourceTowerId: sourceTower.id
-        });
+        if (target.meleeBleedActive) {
+            const resonance = this.getTowerResonanceEffects(sourceTower);
+            const bleedReduction = Math.max(0, target.affixMap?.bleed_dmg_reduction || 0);
+            const extraDamage = hitDamage * (resonance.bleedDamageMult || 1) * (1 - bleedReduction);
 
-        // Immediate burst on apply/refresh.
-        this.damageMob(target, { base: perTick, fire: 0, water: 0, wood: 0 }, sourceTower, false);
+            this.damageMob(target, { base: extraDamage, fire: 0, water: 0, wood: 0 }, sourceTower, false);
+            // target.meleeBleedActive = false; // "怪物下次受到流血效果的攻擊時，會額外受到一次當次傷害", keep the debuff active
+        }
+
+        if (Math.random() < 0.25) {
+            target.meleeBleedActive = true;
+            target.meleeBleedTimer = 3;
+            // 增加怪物承受傷害30%三秒 implemented in damageMob
+            this.addEffect(target.x + 0.5, target.y + 0.5, 'bleed_status', { life: 3, maxLife: 3 });
+        }
     }
 
     addPoisonStack(target, sourceTower, perTickDamage, durationSec, sourcePoisonFreqLevel = 0) {
@@ -3517,6 +3520,10 @@ export class GameEngine {
         mob.slowEffectTimer = Math.max(0, (mob.slowEffectTimer || 0) - dt);
         mob.knockbackFxTimer = Math.max(0, (mob.knockbackFxTimer || 0) - dt);
         mob.poisonEffectTimer = Math.max(0, (mob.poisonEffectTimer || 0) - dt);
+        mob.meleeBleedTimer = Math.max(0, (mob.meleeBleedTimer || 0) - dt);
+        if (mob.meleeBleedTimer <= 0) {
+            mob.meleeBleedActive = false;
+        }
 
         mob.frostbiteTimer = Math.max(0, (mob.frostbiteTimer || 0) - dt);
         if ((mob.frostbiteTimer || 0) <= 0) {

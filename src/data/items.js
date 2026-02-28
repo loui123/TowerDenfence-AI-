@@ -16,7 +16,7 @@ export const ITEM_DEFS = {
         id: 'speed_book',
         name: '速度之書',
         type: ITEM_TYPES.CONSUMABLE,
-        description: '塔的攻擊速度 +10%。',
+        description: '塔的攻擊速度 +5%。',
         icon: '速',
         source: 'wood'
     },
@@ -32,7 +32,7 @@ export const ITEM_DEFS = {
         id: 'crit_book',
         name: '暴擊之書',
         type: ITEM_TYPES.CONSUMABLE,
-        description: '塔的暴擊率 +10%（最高 100%）。',
+        description: '塔的暴擊率 +5%（最高 100%）。',
         icon: '暴',
         source: 'all'
     },
@@ -168,7 +168,7 @@ export const ITEM_DEFS = {
         id: 'chain_lightning',
         name: '閃電',
         type: ITEM_TYPES.EQUIPMENT,
-        description: '塔命中時觸發閃電連鎖（1x基礎傷害、10 次連鎖、10% 機率麻痺 1 秒；可吃連鎖加成）。',
+        description: '塔攻擊命中時 有40%機率觸發連鎖閃電（1x基礎傷害、10 次連鎖、10% 機率麻痺 1 秒；可吃連鎖加成）。',
         icon: '雷',
         source: 'all'
     },

@@ -48,7 +48,7 @@ const UPGRADE_POOL = [
     { id: 'range', label: '攻擊距離 +1', desc: '提升攻擊範圍', maxCount: 4 },
     { id: 'proj_chain_up', label: '連鎖次數 +1', desc: '投射物額外連鎖一次', onlyProjectile: true, maxCount: 4 },
     { id: 'proj_count_up', label: '攻擊數量 +1', desc: '投射物額外命中目標 +1', onlyProjectile: true, maxCount: 2 },
-    { id: 'melee_bleed', label: '附加流血', desc: '近戰命中後 4 秒流血，每秒 30% 傷害（每級 +30%，可疊加）', onlyMelee: true },
+    { id: 'melee_bleed', label: '附加流血', desc: '近戰命中，25%機率附加流血效果(增加怪物承受傷害30%)三秒。怪物下次受到流血效果的攻擊時，會額外受到一次當次傷害', onlyMelee: true },
     { id: 'addition_attack', label: '額外攻擊 +1', desc: '命中時追加 50% 基礎傷害攻擊', onlyMelee: true, maxCount: 3 },
     { id: 'melee_boss_dmg', label: '頭目殺手', desc: '對 Boss 造成的傷害加成 +50%', onlyMelee: true, maxCount: 3 },
     { id: 'slow_power_up', label: '緩速效果增加 +10%', desc: '緩速塔每級額外 +10% 緩速，緩速效果達到上限改為增加怪物承受傷害', onlySlowTower: true, maxCount: 3 },
@@ -96,11 +96,11 @@ const SPECIALIZATION_POOL = [
 ];
 
 const SUPPORT_UPGRADE_POOL = [
-    { id: 'support_attack_aura_up', label: '強化攻擊靈氣效果', desc: '攻擊靈氣效果每級 +15%', requireAura: 'attack' },
-    { id: 'support_speed_aura_up', label: '強化速度靈氣效果', desc: '速度靈氣效果每級 +15%', requireAura: 'speed' },
-    { id: 'support_slow_aura_up', label: '強化緩速靈氣效果', desc: '緩速靈氣效果每級 +15%', requireAura: 'slow' },
-    { id: 'support_crit_aura_up', label: '強化暴擊靈氣效果', desc: '暴擊靈氣效果每級 +15%', requireAura: 'crit' },
-    { id: 'support_spell_aura_up', label: '強化法術靈氣效果', desc: '法術靈氣每級 +20%（最高 5 級）', requireAura: 'spell', maxCount: 5 },
+    { id: 'support_attack_aura_up', label: '強化攻擊靈氣效果', desc: '攻擊靈氣效果每級 +10%', requireAura: 'attack' },
+    { id: 'support_speed_aura_up', label: '強化速度靈氣效果', desc: '速度靈氣效果每級 +10%', requireAura: 'speed' },
+    { id: 'support_slow_aura_up', label: '強化緩速靈氣效果', desc: '緩速靈氣效果每級 +10%', requireAura: 'slow' },
+    { id: 'support_crit_aura_up', label: '強化暴擊靈氣效果', desc: '暴擊靈氣效果每級 +10%', requireAura: 'crit' },
+    { id: 'support_spell_aura_up', label: '強化法術靈氣效果', desc: '法術靈氣每級 +10%（最高 5 級）', requireAura: 'spell', maxCount: 5 },
     { id: 'support_convert_speed_aura', label: '轉換為速度靈氣', desc: '將攻擊靈氣轉為速度靈氣（僅一次）', requireAura: 'attack', isConvert: true },
     { id: 'support_convert_slow_aura', label: '轉換為緩速靈氣', desc: '將攻擊靈氣轉為緩速靈氣（僅一次）', requireAura: 'attack', isConvert: true },
     { id: 'support_convert_crit_aura', label: '轉換為暴擊靈氣', desc: '將攻擊靈氣轉為暴擊靈氣（僅一次）', requireAura: 'attack', isConvert: true },
@@ -108,14 +108,14 @@ const SUPPORT_UPGRADE_POOL = [
     { id: 'support_aura_range_up', label: '範圍增加 1 格', desc: '當前靈氣範圍 +1' },
     { id: 'support_gain_level_book', label: '獲得經驗之書 x1', desc: '立即獲得 1 本經驗之書' },
     { id: 'support_gain_speed_book', label: '獲得速度之書 x1', desc: '立即獲得 1 本速度之書' },
-    { id: 'support_gain_power_book', label: '獲得力量之書 x1', desc: '立即獲得 1 本力量之書' },
+    { id: 'support_gain_power_book', label: '獲得力量之書 x1', desc: '立即獲得 2 本力量之書' },
     { id: 'support_gain_crit_book', label: '獲得暴擊之書 x1', desc: '立即獲得 1 本暴擊之書' },
     { id: 'support_gain_gold_1000', label: '獲得金幣 1000', desc: '立即獲得 1000 金幣' }
 ];
 
 const SUPPORT_SPECIALIZATION_POOL = [
     { id: 'support_spec_level_books_10', label: '經驗之書 x5', desc: '立即獲得 5 本經驗之書' },
-    { id: 'support_spec_speed_books_10', label: '速度之書 x15', desc: '立即獲得 15 本速度之書' },
+    { id: 'support_spec_speed_books_10', label: '速度之書 x5', desc: '立即獲得 5 本速度之書' },
     { id: 'support_spec_power_books_10', label: '力量之書 x15', desc: '立即獲得 15 本力量之書' },
     { id: 'support_spec_crit_books_10', label: '暴擊傷害之書 x5', desc: '立即獲得 5 本暴擊之書' },
     { id: 'support_spec_double_aura', label: '靈氣效果翻倍', desc: '當前塔的靈氣效果提升一倍' },
