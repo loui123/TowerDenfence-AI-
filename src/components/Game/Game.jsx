@@ -28,7 +28,7 @@ const supportBookUpgradeCount = (tower) => (
 const UPGRADE_POOL = [
     { id: 'base_magic_dmg', label: '法術基礎傷害 +20', desc: '法術塔基礎傷害提高 20', onlyMagic: true },
     { id: 'speed_magic', label: '急速施法', desc: '攻擊間隔縮短 20%（最多 5 次）', onlyMagic: true, maxCount: 5 },
-    { id: 'trigger_magic', label: '法術觸發率 +20%', desc: '元素法術觸發機率提高 20%（最多 3 次）', onlyMagic: true, onlyAfterMagicElement: true, maxCount: 3 },
+    { id: 'trigger_magic', label: '法術觸發率 +20%', desc: '元素法術觸發機率提高 20%（最多 1 次）', onlyMagic: true, onlyAfterMagicElement: true, maxCount: 1 },
     { id: 'elemental_fire_magic', label: '法術-炎爆', desc: '攻擊時機率觸發炎爆，升級後提升傷害量', onlyMagic: true, magicElement: 'fire' },
     { id: 'elemental_water_magic', label: '法術-水球', desc: '攻擊時機率觸發水球，升級後提升傷害量', onlyMagic: true, magicElement: 'water' },
     { id: 'elemental_wood_magic', label: '法術-龍捲風', desc: '攻擊時機率觸發龍捲風（龍捲風在場上持續3秒，每秒對範圍內怪物造成傷害），升級後提升傷害量', onlyMagic: true, magicElement: 'wood' },
