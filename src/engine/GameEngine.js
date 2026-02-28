@@ -664,7 +664,9 @@ export class GameEngine {
                 this.mobsSpawned++;
                 this.spawnTimer = spawnInterval;
             }
-        } else if (this.mobs.length === 0) {
+        }
+
+        if (this.mobsSpawned >= waveCount && (this.continuousSpawning || this.mobs.length === 0)) {
             console.log("Wave Complete", this.wave);
             this.waveActive = false;
             this.wave++;

@@ -357,6 +357,17 @@ const Game = ({ onExit }) => {
 
     const [gameOver, setGameOver] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
+    const [isContinuousSpawning, setIsContinuousSpawning] = useState(false);
+
+    useEffect(() => {
+        if (engineRef.current) {
+            engineRef.current.continuousSpawning = isContinuousSpawning;
+        }
+    }, [isContinuousSpawning]);
+
+    const toggleContinuousSpawning = () => {
+        setIsContinuousSpawning(p => !p);
+    };
 
     const [buildTarget, setBuildTarget] = useState(null); // {x, y}
     const [upgradeTarget, setUpgradeTarget] = useState(null); // {x, y}
@@ -1952,6 +1963,21 @@ const Game = ({ onExit }) => {
                     }}
                 >
                     {isPaused ? '繼續' : '暫停'}
+                </button>
+
+                <button
+                    onClick={toggleContinuousSpawning}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: isContinuousSpawning ? '#2b5a2b' : '#333',
+                        border: `1px solid ${isContinuousSpawning ? '#4cd137' : '#555'}`,
+                        color: isContinuousSpawning ? '#fff' : '#aaa'
+                    }}
+                    title="開啟後，只需等該波出怪完畢即刻自動呼叫下一波"
+                >
+                    連續出怪: {isContinuousSpawning ? 'ON' : 'OFF'}
                 </button>
 
                 <button onClick={handleExitWithRecord} style={{ marginLeft: 'auto' }}>離開</button>
