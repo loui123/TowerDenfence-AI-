@@ -2005,13 +2005,14 @@ const Game = ({ onExit }) => {
                     display: isMobile ? 'none' : 'grid',
                     gridTemplateRows: isMobile ? 'auto auto' : '38% 1fr',
                     gap: '8px',
-                    order: isMobile ? 3 : 1
+                    order: isMobile ? 3 : 1,
+                    minHeight: 0
                 }}>
-                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', overflow: 'hidden' }}>
-                        <div style={{ fontSize: '1.1rem', marginBottom: '10px' }}>塔的詳細資訊</div>
+                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+                        <div style={{ fontSize: '1.1rem', marginBottom: '10px', flexShrink: 0 }}>塔的詳細資訊</div>
                         {selectedTower && selectedTowerDetail ? (
-                            <div style={{ lineHeight: 1.42, color: '#ddd', height: 'calc(100% - 32px)', display: 'grid', gridTemplateColumns: '1.2fr 0.95fr', gap: '10px', minHeight: 0 }}>
-                                <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                            <div style={{ lineHeight: 1.42, color: '#ddd', flex: 1, display: 'grid', gridTemplateColumns: '1.2fr 0.95fr', gap: '10px', minHeight: 0 }}>
+                                <div style={{ minWidth: 0, overflowY: 'auto', paddingRight: '4px' }}>
                                     <div>名稱: {getTowerName(selectedTower.type)}</div>
                                     <div>等級: {selectedTower.level}</div>
                                     {selectedTowerDetail.equipmentName && <div>裝備: {selectedTowerDetail.equipmentName}</div>}
@@ -2042,17 +2043,19 @@ const Game = ({ onExit }) => {
                                     )}
                                 </div>
 
-                                <div style={{ borderLeft: '1px solid #2f2f2f', paddingLeft: '10px', overflow: 'hidden', minWidth: 0 }}>
-                                    <div style={{ marginBottom: '4px', color: '#e5e5e5' }}>已選天賦</div>
-                                    {selectedTowerDetail.talentRows.length === 0 ? (
-                                        <div style={{ color: '#8a8a8a' }}>尚未選擇天賦</div>
-                                    ) : (
-                                        selectedTowerDetail.talentRows.map((row) => (
-                                            <div key={row.key} style={{ color: row.isSpec ? '#c0c0c0' : '#d7d7d7' }}>
-                                                {row.label} {row.isSpec ? '專精' : (row.isMax ? 'LVMax' : `LV${row.level}`)}
-                                            </div>
-                                        ))
-                                    )}
+                                <div style={{ borderLeft: '1px solid #2f2f2f', paddingLeft: '10px', minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                                    <div style={{ marginBottom: '4px', color: '#e5e5e5', flexShrink: 0 }}>已選天賦</div>
+                                    <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', minHeight: 0 }}>
+                                        {selectedTowerDetail.talentRows.length === 0 ? (
+                                            <div style={{ color: '#8a8a8a' }}>尚未選擇天賦</div>
+                                        ) : (
+                                            selectedTowerDetail.talentRows.map((row) => (
+                                                <div key={row.key} style={{ color: row.isSpec ? '#c0c0c0' : '#d7d7d7' }}>
+                                                    {row.label} {row.isSpec ? '專精' : (row.isMax ? 'LVMax' : `LV${row.level}`)}
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ) : (
@@ -2060,54 +2063,56 @@ const Game = ({ onExit }) => {
                         )}
                     </div>
 
-                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', overflowY: 'auto', overflowX: 'hidden' }}>
-                        <div style={{ fontSize: '1.1rem', marginBottom: '10px' }}>所有塔資訊</div>
-                        {towerRows.length === 0 ? (
-                            <div style={{ color: '#8a8a8a' }}>目前還沒有塔</div>
-                        ) : (
-                            towerRows.map((row) => (
-                                <div
-                                    key={row.id}
-                                    onClick={() => setSelectedTowerId(row.id)}
-                                    style={{
-                                        border: selectedTowerId === row.id ? '1px solid #55c18f' : '1px solid #2f2f2f',
-                                        background: selectedTowerId === row.id ? 'rgba(85, 193, 143, 0.14)' : 'transparent',
-                                        borderRadius: '6px',
-                                        padding: '6px',
-                                        marginBottom: '6px',
-                                        fontSize: '0.9rem',
-                                        lineHeight: 1.35,
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    <div style={{ color: '#f0f0f0' }}>{row.name} Lv.{row.level}</div>
-                                    {row.supportAuraType ? (
-                                        <div style={{ color: '#bcbcbc' }}>
-                                            待升級: {row.pendingUpgrades} | 待專精: {row.pendingSpecialization ? '是' : '否'} | EXP: {row.supportExp}/15 | 靈氣: {row.supportAuraType} | 範圍: {row.supportAuraRange}
-                                        </div>
-                                    ) : (
-                                        <div style={{ color: '#bcbcbc' }}>
-                                            待升級: {row.pendingUpgrades} | 待專精: {row.pendingSpecialization ? '是' : '否'} | K: {row.kills} | Dmg: {row.damage}
-                                        </div>
-                                    )}
-                                    {row.supportAuraStatus ? (
-                                        <div style={{ color: '#8de8df' }}>
-                                            靈氣效果 +{(row.supportAuraStatus.effectPct || 0).toFixed(0)}% | 影響塔 {row.supportAuraStatus.affectedTowerCount || 0}
-                                        </div>
-                                    ) : (
-                                        <div style={{ color: '#ffd99b' }}>
-                                            靈氣加成: 傷 +{(row.auraSnapshot?.damagePct || 0).toFixed(0)}% | 速 +{(row.auraSnapshot?.speedPct || 0).toFixed(0)}% | 暴 +{(row.auraSnapshot?.critChancePct || 0).toFixed(0)}%
-                                        </div>
-                                    )}
-                                    {row.equipmentName && (
-                                        <div style={{ color: '#9ad7ff' }}>裝備: {row.equipmentName}</div>
-                                    )}
-                                    {row.resonanceNames?.length > 0 && (
-                                        <div style={{ color: '#9ad7ff' }}>共鳴: {row.resonanceNames.join('、')}</div>
-                                    )}
-                                </div>
-                            ))
-                        )}
+                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+                        <div style={{ fontSize: '1.1rem', marginBottom: '10px', flexShrink: 0 }}>所有塔資訊</div>
+                        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px', minHeight: 0 }}>
+                            {towerRows.length === 0 ? (
+                                <div style={{ color: '#8a8a8a' }}>目前還沒有塔</div>
+                            ) : (
+                                towerRows.map((row) => (
+                                    <div
+                                        key={row.id}
+                                        onClick={() => setSelectedTowerId(row.id)}
+                                        style={{
+                                            border: selectedTowerId === row.id ? '1px solid #55c18f' : '1px solid #2f2f2f',
+                                            background: selectedTowerId === row.id ? 'rgba(85, 193, 143, 0.14)' : 'transparent',
+                                            borderRadius: '6px',
+                                            padding: '6px',
+                                            marginBottom: '6px',
+                                            fontSize: '0.9rem',
+                                            lineHeight: 1.35,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <div style={{ color: '#f0f0f0' }}>{row.name} Lv.{row.level}</div>
+                                        {row.supportAuraType ? (
+                                            <div style={{ color: '#bcbcbc' }}>
+                                                待升級: {row.pendingUpgrades} | 待專精: {row.pendingSpecialization ? '是' : '否'} | EXP: {row.supportExp}/15 | 靈氣: {row.supportAuraType} | 範圍: {row.supportAuraRange}
+                                            </div>
+                                        ) : (
+                                            <div style={{ color: '#bcbcbc' }}>
+                                                待升級: {row.pendingUpgrades} | 待專精: {row.pendingSpecialization ? '是' : '否'} | K: {row.kills} | Dmg: {row.damage}
+                                            </div>
+                                        )}
+                                        {row.supportAuraStatus ? (
+                                            <div style={{ color: '#8de8df' }}>
+                                                靈氣效果 +{(row.supportAuraStatus.effectPct || 0).toFixed(0)}% | 影響塔 {row.supportAuraStatus.affectedTowerCount || 0}
+                                            </div>
+                                        ) : (
+                                            <div style={{ color: '#ffd99b' }}>
+                                                靈氣加成: 傷 +{(row.auraSnapshot?.damagePct || 0).toFixed(0)}% | 速 +{(row.auraSnapshot?.speedPct || 0).toFixed(0)}% | 暴 +{(row.auraSnapshot?.critChancePct || 0).toFixed(0)}%
+                                            </div>
+                                        )}
+                                        {row.equipmentName && (
+                                            <div style={{ color: '#9ad7ff' }}>裝備: {row.equipmentName}</div>
+                                        )}
+                                        {row.resonanceNames?.length > 0 && (
+                                            <div style={{ color: '#9ad7ff' }}>共鳴: {row.resonanceNames.join('、')}</div>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -2558,11 +2563,11 @@ const Game = ({ onExit }) => {
                     minHeight: 0,
                     overflow: 'hidden'
                 }}>
-                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', overflow: 'hidden', minHeight: 0 }}>
-                        <div style={{ fontSize: '1.1rem', marginBottom: '10px' }}>當波怪物資訊</div>
+                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+                        <div style={{ fontSize: '1.1rem', marginBottom: '10px', flexShrink: 0 }}>當波怪物資訊</div>
                         {waveInfo && (
-                            <div style={{ display: 'grid', gridTemplateColumns: nextWaveInfo ? '1fr 1fr' : '1fr', gap: '12px', lineHeight: 1.35, color: '#ddd', fontSize: '0.9rem' }}>
-                                <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: nextWaveInfo ? '1fr 1fr' : '1fr', gap: '12px', lineHeight: 1.35, color: '#ddd', fontSize: '0.9rem', flex: 1, minHeight: 0 }}>
+                                <div style={{ minWidth: 0, overflowY: 'auto', paddingRight: '4px' }}>
                                     <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>當波怪物資訊</div>
                                     <div style={{ marginBottom: '6px' }}>
                                         <img src={waveInfo.image} alt={waveInfo.type} style={{ width: 36, height: 36, objectFit: 'contain' }} />
@@ -2586,7 +2591,7 @@ const Game = ({ onExit }) => {
                                     )}
                                 </div>
                                 {nextWaveInfo && (
-                                    <div style={{ minWidth: 0, borderLeft: '1px solid #2f2f2f', paddingLeft: '10px' }}>
+                                    <div style={{ minWidth: 0, borderLeft: '1px solid #2f2f2f', paddingLeft: '10px', overflowY: 'auto', paddingRight: '4px' }}>
                                         <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>下波怪物資訊</div>
                                         <div style={{ marginBottom: '6px' }}>
                                             <img src={nextWaveInfo.image} alt={nextWaveInfo.type} style={{ width: 36, height: 36, objectFit: 'contain' }} />
@@ -2612,28 +2617,32 @@ const Game = ({ onExit }) => {
                         )}
                     </div>
 
-                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', overflow: 'hidden', display: 'grid', gridTemplateRows: 'auto 1fr', gap: '10px', minHeight: 0, boxSizing: 'border-box' }}>
-                        <div style={{ fontSize: '1.1rem' }}>更新日誌 / Console</div>
-                        <div style={{ minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '10px' }}>
-                            <div style={{ border: '1px solid #3b3b3b', borderRadius: '6px', padding: '8px', overflow: 'hidden' }}>
-                                <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>更新日誌</div>
-                                {UPDATE_LOG_ITEMS.map((item, idx) => (
-                                    <div key={`update-${idx}`} style={{ color: '#cfd6df', fontSize: '0.84rem', lineHeight: 1.4, marginBottom: '4px' }}>
-                                        {idx + 1}. {item}
-                                    </div>
-                                ))}
-                            </div>
-                            <div style={{ border: '1px solid #3b3b3b', borderRadius: '6px', padding: '8px', overflow: 'hidden' }}>
-                                <div style={{ color: '#8dd2ff', marginBottom: '6px' }}>Console</div>
-                                {consoleLog.length === 0 ? (
-                                    <div style={{ color: '#8a8a8a', fontSize: '0.84rem' }}>尚無紀錄</div>
-                                ) : (
-                                    consoleLog.map((line, idx) => (
-                                        <div key={`console-${idx}`} style={{ color: '#9bcf9f', fontSize: '0.82rem', lineHeight: 1.35, borderBottom: '1px solid #272727', padding: '3px 0' }}>
-                                            {line}
+                    <div style={{ border: '2px solid #ddd', padding: '14px', background: 'rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', gap: '10px', minHeight: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
+                        <div style={{ fontSize: '1.1rem', flexShrink: 0 }}>更新日誌 / Console</div>
+                        <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '10px' }}>
+                            <div style={{ border: '1px solid #3b3b3b', borderRadius: '6px', padding: '8px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                                <div style={{ color: '#8dd2ff', marginBottom: '6px', flexShrink: 0 }}>更新日誌</div>
+                                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '4px' }}>
+                                    {UPDATE_LOG_ITEMS.map((item, idx) => (
+                                        <div key={`update-${idx}`} style={{ color: '#cfd6df', fontSize: '0.84rem', lineHeight: 1.4, marginBottom: '4px' }}>
+                                            {idx + 1}. {item}
                                         </div>
-                                    ))
-                                )}
+                                    ))}
+                                </div>
+                            </div>
+                            <div style={{ border: '1px solid #3b3b3b', borderRadius: '6px', padding: '8px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                                <div style={{ color: '#8dd2ff', marginBottom: '6px', flexShrink: 0 }}>Console</div>
+                                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: '4px' }}>
+                                    {consoleLog.length === 0 ? (
+                                        <div style={{ color: '#8a8a8a', fontSize: '0.84rem' }}>尚無紀錄</div>
+                                    ) : (
+                                        consoleLog.map((line, idx) => (
+                                            <div key={`console-${idx}`} style={{ color: '#9bcf9f', fontSize: '0.82rem', lineHeight: 1.35, borderBottom: '1px solid #272727', padding: '3px 0' }}>
+                                                {line}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
