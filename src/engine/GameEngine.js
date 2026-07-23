@@ -2,6 +2,9 @@
 import { TOWER_TYPES, MONSTER_TYPES, WAVE_CONFIG, TALENTS, RESOURCES } from '../data/constants';
 import { ITEM_DEFS, ITEM_TYPES, MONSTER_ITEM_DROP_TABLE, BOSS_EXTRA_DROP_TABLE } from '../data/items';
 
+const MAX_VISUAL_EFFECTS = 240;
+const MAX_FLOATING_TEXTS = 180;
+
 export class GameEngine {
     constructor(grid, path, talents, events) {
         this.grid = grid;
@@ -635,9 +638,15 @@ export class GameEngine {
             angle: Math.random() * Math.PI * 2,
             ...opts
         });
+        if (this.effects.length > MAX_VISUAL_EFFECTS) {
+            this.effects.splice(0, this.effects.length - MAX_VISUAL_EFFECTS);
+        }
     }
 
     updateFloatingTexts(dt) {
+        if (this.floatingTexts.length > MAX_FLOATING_TEXTS) {
+            this.floatingTexts.splice(0, this.floatingTexts.length - MAX_FLOATING_TEXTS);
+        }
         for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
             const ft = this.floatingTexts[i];
             ft.life -= dt;
@@ -1490,59 +1499,13 @@ export class GameEngine {
         return true;
     }
 
-    createSpecializationSnapshot(tower) {
-        return {
-            stats: { ...(tower.stats || {}) },
-            speedBookStacks: Math.max(0, Math.floor(tower.speedBookStacks || 0)),
-            powerBookStacks: Math.max(0, Math.floor(tower.powerBookStacks || 0)),
-            chainNoLimit: !!tower.chainNoLimit,
-            masterySpeedMult: tower.masterySpeedMult || 1,
-            redistributeKillExp: !!tower.redistributeKillExp,
-            randomCritBonus: !!tower.randomCritBonus,
-            hitStun: tower.hitStun || 0,
-            localFireExplosion: !!tower.localFireExplosion,
-            disableAttributes: !!tower.disableAttributes,
-            bleedDamageMult: tower.bleedDamageMult || 1,
-            bleedDurationOverride: tower.bleedDurationOverride || 0,
-            magicTriggerChanceBonus: tower.magicTriggerChanceBonus || 0,
-            magicAilmentPowerMult: tower.magicAilmentPowerMult || 1,
-            magicFireDamageMult: tower.magicFireDamageMult || 1,
-            magicWaterDamageMult: tower.magicWaterDamageMult || 1,
-            magicWoodDamageMult: tower.magicWoodDamageMult || 1,
-            supportAuraDouble: !!tower.supportAuraDouble,
-            supportAuraRangeBonus: tower.supportAuraRangeBonus || 0,
-            supportSpellAuraLevel: tower.supportSpellAuraLevel || 0,
-            supportLuckyAura: !!tower.supportLuckyAura,
-            supportLuckyAuraTimer: tower.supportLuckyAuraTimer || 0,
-            supportLuckyCritDmgBonus: tower.supportLuckyCritDmgBonus || 0
-        };
+    createSpecializationSnapshot() {
+        // Obsolete: We no longer snapshot to avoid overwriting later book usages.
+        return null;
     }
 
-    restoreSpecializationSnapshot(tower, snapshot) {
-        if (!tower || !snapshot) return;
-        tower.stats = { ...(snapshot.stats || tower.stats) };
-        tower.speedBookStacks = Math.max(0, Math.floor(snapshot.speedBookStacks || 0));
-        tower.powerBookStacks = Math.max(0, Math.floor(snapshot.powerBookStacks || 0));
-        tower.chainNoLimit = !!snapshot.chainNoLimit;
-        tower.masterySpeedMult = snapshot.masterySpeedMult || 1;
-        tower.redistributeKillExp = !!snapshot.redistributeKillExp;
-        tower.randomCritBonus = !!snapshot.randomCritBonus;
-        tower.hitStun = snapshot.hitStun || 0;
-        tower.localFireExplosion = !!snapshot.localFireExplosion;
-        tower.disableAttributes = !!snapshot.disableAttributes;
-        tower.bleedDamageMult = snapshot.bleedDamageMult || 1;
-        tower.bleedDurationOverride = snapshot.bleedDurationOverride || 0;
-        tower.magicTriggerChanceBonus = snapshot.magicTriggerChanceBonus || 0;
-        tower.magicAilmentPowerMult = snapshot.magicAilmentPowerMult || 1;
-        tower.magicFireDamageMult = snapshot.magicFireDamageMult || 1;
-        tower.magicWaterDamageMult = snapshot.magicWaterDamageMult || 1;
-        tower.magicWoodDamageMult = snapshot.magicWoodDamageMult || 1;
-        tower.supportAuraDouble = !!snapshot.supportAuraDouble;
-        tower.supportAuraRangeBonus = snapshot.supportAuraRangeBonus || 0;
-        tower.supportSpellAuraLevel = snapshot.supportSpellAuraLevel || 0;
-        tower.supportLuckyAura = !!snapshot.supportLuckyAura;
-        tower.supportLuckyAuraTimer = snapshot.supportLuckyAuraTimer || 0;
-        tower.supportLuckyCritDmgBonus = snapshot.supportLuckyCritDmgBonus || 0;
+    restoreSpecializationSnapshot() {
+        // Obsolete
     }
 
     recomputeGlobalMasteriesFromSpecializations() {
@@ -1632,23 +1595,57 @@ export class GameEngine {
     }
 
     resetTowerSpecialization(tower) {
-        if (!tower || !tower.specializationChosen) return false;
-        if (tower.level < 10) return false;
-        if (!tower.preSpecializationSnapshot) return false;
+        if (!tower || !tower.specializationChosen || !tower.specializationId) return false;
 
-        this.restoreSpecializationSnapshot(tower, tower.preSpecializationSnapshot);
+        const specId = tower.specializationId;
+        if (tower.type === 'support') {
+            if (specId === 'support_spec_double_aura') tower.supportAuraDouble = false;
+            if (specId === 'support_spec_range_5') tower.supportAuraRangeBonus = Math.max(0, (tower.supportAuraRangeBonus || 0) - 5);
+            if (specId === 'support_spec_lucky_aura') {
+                tower.supportLuckyAura = false;
+                tower.supportLuckyAuraTimer = 0;
+                tower.supportLuckyCritDmgBonus = 0;
+            }
+        } else {
+            switch (specId) {
+                case 'spec_chain_no_limit': tower.chainNoLimit = false; break;
+                case 'spec_tower_speed_50': tower.masterySpeedMult = (tower.masterySpeedMult || 1) / 1.4; break;
+                case 'spec_tower_base_100': tower.specBase100 = false; break;
+                case 'spec_tower_range_3': tower.stats.range -= 3; break;
+                case 'spec_tower_share_exp': tower.redistributeKillExp = false; break;
+                case 'spec_tower_crit_random': tower.randomCritBonus = false; break;
+                case 'spec_tower_stun_02': tower.hitStun = 0; break;
+                case 'spec_tower_fire_explosion': tower.localFireExplosion = false; break;
+                case 'spec_tower_attr_off_triple':
+                    tower.disableAttributes = false;
+                    tower.specAttrOffTriple = false;
+                    break;
+                case 'spec_tower_half_dmg_double_speed':
+                    tower.specHalfDamage = false;
+                    tower.masterySpeedMult = (tower.masterySpeedMult || 1) / 2.0;
+                    break;
+                case 'spec_tower_boss_killer': tower.specBossKiller = false; break;
+                case 'spec_tower_bleed':
+                    tower.bleedDamageMult = (tower.bleedDamageMult || 1) / 3.0;
+                    if (tower.bleedDurationOverride === 10) tower.bleedDurationOverride = 0;
+                    break;
+                case 'spec_magic_wood_base': tower.magicWoodDamageMult = (tower.magicWoodDamageMult || 1) / 2.0; break;
+                case 'spec_magic_water_frost_trigger': tower.magicWaterDamageMult = (tower.magicWaterDamageMult || 1) / 2.0; break;
+                case 'spec_magic_fire_speed': tower.magicFireDamageMult = (tower.magicFireDamageMult || 1) / 2.0; break;
+                case 'spec_magic_dual_ailment': tower.magicAilmentPowerMult = (tower.magicAilmentPowerMult || 1) / 3.0; break;
+            }
+        }
+
         tower.specializationChosen = false;
         tower.specializationId = null;
         tower.pendingSpecialization = true;
         this.recomputeGlobalMasteriesFromSpecializations();
+        this.recalculateTowerDamage(tower);
         return true;
     }
 
     applyTowerSpecialization(tower, specId) {
         if (!tower || !tower.pendingSpecialization || tower.specializationChosen) return false;
-        if (!tower.preSpecializationSnapshot) {
-            tower.preSpecializationSnapshot = this.createSpecializationSnapshot(tower);
-        }
 
         if (tower.type === 'support') {
             switch (specId) {
@@ -1717,7 +1714,7 @@ export class GameEngine {
                 tower.masterySpeedMult = (tower.masterySpeedMult || 1) * 1.4;
                 break;
             case 'spec_tower_base_100':
-                tower.stats.damage *= 2.0;
+                tower.specBase100 = true;
                 break;
             case 'spec_tower_range_3':
                 tower.stats.range += 3;
@@ -1736,10 +1733,10 @@ export class GameEngine {
                 break;
             case 'spec_tower_attr_off_triple':
                 tower.disableAttributes = true;
-                tower.stats.damage *= 3;
+                tower.specAttrOffTriple = true;
                 break;
             case 'spec_tower_half_dmg_double_speed':
-                tower.stats.damage *= 0.5;
+                tower.specHalfDamage = true;
                 tower.masterySpeedMult = (tower.masterySpeedMult || 1) * 2.0;
                 break;
             case 'spec_tower_boss_killer':

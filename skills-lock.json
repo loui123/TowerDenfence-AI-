@@ -5154,7 +5154,7 @@
     "Vincent - Brave Search for agents": {
       "source": "openclaw/skills",
       "sourceType": "github",
-      "computedHash": "c8149fe5b0c51af8de66ae7351d1264389e9c1154988bf34a5a4222a31c8532e"
+      "computedHash": "ac889bfd822f71fd9b5044abf9d1271524de9ad908c49c8ac72012b18f0c004d"
     },
     "Vincent - Credentials for agents": {
       "source": "openclaw/skills",
@@ -5169,7 +5169,7 @@
     "Vincent - Twitter / X.com for agents": {
       "source": "openclaw/skills",
       "sourceType": "github",
-      "computedHash": "3c0b2b7615911aafb4b07193fba9d7d77e210a0859eb3e65478e393219d365a5"
+      "computedHash": "f308524450d57007ea01fa4a043e33163be7cb317c3dba51c0263b6e1ff017f2"
     },
     "Violin": {
       "source": "openclaw/skills",
@@ -32889,7 +32889,7 @@
     "openclaw-commerce-shopify": {
       "source": "openclaw/skills",
       "sourceType": "github",
-      "computedHash": "5d073ab1f6428093ff108ce075f39c05715243d02a9cfbead1b5f64db2866430"
+      "computedHash": "aff98257ab8a2e2b5626c7f5083ed6ae0aae1450f68282ceb0efedc20e3c5bdd"
     },
     "openclaw-config": {
       "source": "openclaw/skills",
@@ -35049,7 +35049,7 @@
     "pinchtab": {
       "source": "openclaw/skills",
       "sourceType": "github",
-      "computedHash": "4a9c79b718359cf7d1c463a3999092f226f6e3905571ca14b8c4ed927cb080c0"
+      "computedHash": "c208ce1b3609125436395f487032a0102a3acaf64d236da85df3a4d63d0da60c"
     },
     "pinchwork": {
       "source": "openclaw/skills",
@@ -42404,7 +42404,7 @@
     "soulforge": {
       "source": "openclaw/skills",
       "sourceType": "github",
-      "computedHash": "55357f70888baa5b89f7d725b592da7b3b37cbf1809c8981792780b41d7f0f37"
+      "computedHash": "24c0d20e5c3997dbcadb5c4043d127c37779f0b528a35f4c97acbdf17426234b"
     },
     "soulmate": {
       "source": "openclaw/skills",
@@ -44879,7 +44879,7 @@
     "tg-canvas": {
       "source": "openclaw/skills",
       "sourceType": "github",
-      "computedHash": "2339c3e6b768e38821fbd43a4706943b27f7db91c184dfcb415db9f303b4beb8"
+      "computedHash": "16572bef19ccae8a90a9c18d3d4fa24e4bbd9826a5666d45c79bd5cff6f47a4f"
     },
     "tg-channel-manager": {
       "source": "openclaw/skills",
